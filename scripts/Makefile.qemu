@@ -1,0 +1,42 @@
+# QEMU related rules and configuration
+
+QEMU_OVMF_CURL_FLAGS := -L
+
+ifneq ($(Q),)
+    QEMU_OVMF_CURL_FLAGS += --show-error --silent
+endif
+
+QEMU_OVMF_ARCHIVE_LINK := \
+	https://github.com/osdev0/edk2-ovmf-nightly/releases/latest/download/edk2-ovmf.tar.gz
+
+PHONY += qemu_get_ovmf
+qemu_get_ovmf: $(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed
+
+$(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed:
+	$(Q)echo "Downloading and unpacking OVMF into '$(BUILD_DEPS_LOCATION)'..."
+	$(Q)mkdir -p $(BUILD_DEPS_LOCATION)
+	$(Q)curl $(QEMU_OVMF_CURL_FLAGS) $(QEMU_OVMF_ARCHIVE_LINK) \
+		| tar -C $(BUILD_DEPS_LOCATION) -zxf -
+	$(Q)touch $(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed
+
+TARGET_ISO := $(BUILD_TARGET_LOCATION)/isos/$(OUTPUT).iso
+QEMUFLAGS :=
+
+ifdef QEMU_GDB_DEBUG
+	QEMUFLAGS += --nographic -S
+endif
+
+PHONY += qemu_run_iso_uefi
+qemu_run_iso_uefi: qemu_get_ovmf $(TARGET_ISO)
+	$(Q)echo "Starting $(NAME)..."
+	$(Q)qemu-system-x86_64 \
+		-cpu host,+vmx \
+		-m 8G \
+		-enable-kvm \
+		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-cdrom $(TARGET_ISO) \
+		-boot d \
+		-s \
+		$(QEMUFLAGS)
+
+

@@ -1,12 +1,12 @@
 # Disable implicit suffix rules
 .SUFFIXES :=
 
-override NAME := HyveMind
+override NAME 	:= HyveMind
 override OUTPUT := hyvemind
 
 BUILD_TARGET_DIR_NAME 	:= build
 BUILD_DEPS_DIR_NAME		:= deps
-BUILD_TARGET_DIR_PATH	:= $(PWD)
+BUILD_TARGET_DIR_PATH	= $(PWD)
 override BUILD_TARGET_LOCATION 	:= $(BUILD_TARGET_DIR_PATH)/$(BUILD_TARGET_DIR_NAME)
 override BUILD_DEPS_LOCATION	:= $(BUILD_TARGET_LOCATION)/$(BUILD_DEPS_DIR_NAME)
 
@@ -156,7 +156,7 @@ $(OBJ_PREFIX)ext-deps/%.asm.o: %.asm GNUmakefile
 PHONY += install_build_dependencies
 install_build_dependencies: create_build_target
 	$(Q)echo "Attempting to install hypervisor build dependencies..."
-	$(Q) ../scripts/get-hypervisor-build-deps.sh $(BUILD_DEPS_LOCATION)
+	$(Q) ../scripts/deps/get-hypervisor-build-deps.sh $(BUILD_DEPS_LOCATION)
 	$(Q)echo "Successfully installed hypervisor build dependencies!"
 
 PHONY += create_build_target
@@ -176,6 +176,8 @@ clean:
 PHONY += distclean
 distclean:
 	$(Q)rm -rf $(BUILD_TARGET_LOCATION)
+	$(Q)rm -rf .cache/
+	$(Q)rm -rf compile_commands.json
 
 .PHONY = $(PHONY)
 

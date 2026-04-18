@@ -1,5 +1,4 @@
 #! /bin/sh
-
 # Based on the script provided by the Limine bootloader
 
 set -e
@@ -13,12 +12,11 @@ usage() {
 
 check_install_path() {
     if test -z "$INSTALL_PATH"; then
-        echo "Error: No installation target directory specified!"
         usage
     fi
 
     if test ! -d "$INSTALL_PATH"; then
-        echo "Error: directory '$INSTALL_PATH' does not exist!"
+        echo "Error: The specified installation directory '$INSTALL_PATH' does not exist!"
         exit 1
     fi
 }
