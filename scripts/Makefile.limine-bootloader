@@ -1,0 +1,44 @@
+# Variables and rules related to downloading and building the Limine bootloader
+
+LIMINE_INSTALLATION_PATH = $(BUILD_DEPS_LOCATION)/limine
+
+LIMINE_BOOTLOADER_BRANCH := --branch=v11.x-binary
+LIMINE_GIT_CLONE_DATA := \
+	https://github.com/Limine-Bootloader/Limine.git \
+	$(LIMINE_INSTALLATION_PATH) \
+	$(LIMINE_BOOTLOADER_BRANCH) \
+	--depth=1
+
+PHONY += download_limine_bootloader
+download_limine_bootloader: $(LIMINE_INSTALLATION_PATH)/.cloned
+
+$(LIMINE_INSTALLATION_PATH)/.cloned:
+	$(Q)echo "Downloading the limine bootloader into '$(LIMINE_INSTALLATION_PATH)'"
+	$(Q)rm -rf $(LIMINE_INSTALLATION_PATH)
+	$(Q)git clone $(LIMINE_GIT_CLONE_DATA)
+	$(Q)touch $(LIMINE_INSTALLATION_PATH)/.cloned
+
+PHONY += delete_limine_bootloader_installation
+delete_limine_bootloader_installation:
+	$(Q)echo "Deleting the downloaded limine bootloader files..."
+	$(Q)rm -rf $(LIMINE_INSTALLATION_PATH)
+
+LIMINE_HOST_CC := gcc
+LIMINE_HOST_CFLAGS := -g -O2 -pipe
+LIMINE_HOST_CPPFLAGS :=
+LIMINE_HOST_LDFLAGS :=
+LIMINE_HOST_LIBS :=
+
+PHONY += build_limine_bootloader
+build_limine_bootloader: | $(LIMINE_INSTALLATION_PATH)/.cloned
+	$(Q)echo "Building the limine bootloader..."
+	$(Q)$(MAKE) -C $(LIMINE_INSTALLATION_PATH)	\
+		CC="$(LIMINE_HOST_CC)"					\
+		CFLAGS="$(LIMINE_HOST_CFLAGS)"			\
+		CPPFLAGS="$(LIMINE_HOST_CPPFLAGS)"		\
+		LDFLAGS="$(LIMINE_HOST_LDFLAGS)"		\
+		LIBS="$(LIMINE_HOST_LIBS)"
+
+PHONY += install_limine_bootloader
+install_limine_bootloader: download_limine_bootloader build_limine_bootloader
+
