@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "limine.h"
+#include "logger.h"
 
 __attribute__((used, section(".limine_requests")))
 static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
@@ -27,6 +28,12 @@ hypervisor_main(void)
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         die();
     }
+
+    if (init_debug_logging()) {
+        die();
+    }
+
+    debug_printf("Debug logging successfully initialized!");
 
     die();
 }

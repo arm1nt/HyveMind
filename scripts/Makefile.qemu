@@ -23,7 +23,7 @@ TARGET_ISO := $(BUILD_TARGET_LOCATION)/isos/$(OUTPUT).iso
 QEMUFLAGS :=
 
 ifdef QEMU_GDB_DEBUG
-	QEMUFLAGS += --nographic -S
+	QEMUFLAGS += -nographic -S
 endif
 
 PHONY += qemu_run_iso_uefi
@@ -38,5 +38,4 @@ qemu_run_iso_uefi: qemu_get_ovmf $(TARGET_ISO)
 		-boot d \
 		-s \
 		$(QEMUFLAGS)
-
 
