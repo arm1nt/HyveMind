@@ -47,7 +47,6 @@ clone_repo_commit() {
     fi
 }
 
-
 check_install_path
 
 rm -f "$INSTALL_PATH"/.deps-installed
