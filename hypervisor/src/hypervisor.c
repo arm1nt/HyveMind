@@ -1,17 +1,8 @@
-#include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
-#include "limine.h"
+#include "limine/requests.h"
 #include "logger.h"
-
-__attribute__((used, section(".limine_requests")))
-static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
-
-__attribute__((used, section(".limine_requests_start")))
-static volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
-
-__attribute__((used, section(".limine_requests_end")))
-static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 static void __attribute__((noreturn))
 die(void)
@@ -34,6 +25,12 @@ hypervisor_main(void)
     }
 
     debug_printf("Debug logging successfully initialized!");
+
+    /* Ensure that we get a memory map from the bootloader */
+    if (memmap_request.response == NULL || memmap_request.response->entry_count < 1) {
+        debug_printf("The bootloader did not provide a memory map!");
+        die();
+    }
 
     die();
 }
