@@ -1,4 +1,7 @@
 build/
+
 resources/*
 !resources/.gitkeep
+
+compile_commands.json
 
