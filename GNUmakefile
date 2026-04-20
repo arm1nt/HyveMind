@@ -38,7 +38,7 @@ PHONY += gen_iso_root_dir
 gen_iso_root_dir: install_limine_bootloader build_hypervisor
 	$(Q)echo "Generating iso root directory..."
 	$(Q)rm -rf $(ISO_ROOT_DIR)
-	$(Q)mkdir -p $(ISO_ROOT_DIR)/{boot/limine,EFI/BOOT}
+	$(Q)mkdir -p $(ISO_ROOT_DIR)/{boot/limine,EFI/BOOT,guest-info}
 	$(Q)cp -v hypervisor/build/bin-x64/hyvemind $(ISO_ROOT_DIR)/boot
 	$(Q)cp -v limine.conf $(BUILD_DEPS_LOCATION)/limine/limine-bios.sys \
 		$(BUILD_DEPS_LOCATION)/limine/limine-bios-cd.bin \
@@ -47,6 +47,7 @@ gen_iso_root_dir: install_limine_bootloader build_hypervisor
 	$(Q)cp -v $(BUILD_DEPS_LOCATION)/limine/BOOTX64.EFI \
 		$(BUILD_DEPS_LOCATION)/limine/BOOTIA32.EFI \
 		$(ISO_ROOT_DIR)/EFI/BOOT/
+	$(Q)cp hypervisor/resources/* $(ISO_ROOT_DIR)/guest-info/
 
 PHONY += gen_iso_image
 gen_iso_image: $(BUILD_TARGET_LOCATION)/isos/$(OUTPUT).iso
