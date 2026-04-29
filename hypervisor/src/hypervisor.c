@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "limine/requests.h"
+#include "mm.h"
 #include "printf.h"
 
 static void __attribute__((noreturn))
@@ -72,9 +73,17 @@ hypervisor_main(void)
     if (init_printf() != 0) {
         die();
     }
+
     printf("Successfully initialized printf!");
 
     confirm_bootloader_info();
+
+    if (early_init_page_frame_allocator(memmap_request.response, hhdm_request.response->offset) != 0) {
+        printf("Failed to initialize the page frame allocator");
+        die();
+    }
+
+    printf("(Early-)Initialized the pageframe allocator");
 
     die();
 }
