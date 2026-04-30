@@ -294,6 +294,25 @@ out_found_area:
     return 0;
 }
 
+inline int
+free_page(const phys_addr_t __directly_mapped addr)
+{
+    return free_pages(1, addr);
+}
+
+int
+free_pages(const uint64_t nr, const phys_addr_t __directly_mapped addr)
+{
+    for (uint64_t i = 0; i < nr; i++) {
+        const phys_addr_t real_phys = (addr + i*PAGE_SIZE) - DIRECT_MAPPING_OFFSET;
+        toggle_bitmap_entry(real_phys);
+    }
+
+    pf_allocator->allocated_page_frames -= nr;
+
+    return 0;
+}
+
 int
 early_init_page_frame_allocator(
         struct limine_memmap_response *mem_map,

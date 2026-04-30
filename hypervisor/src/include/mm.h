@@ -33,5 +33,8 @@ int early_init_page_frame_allocator(
  */
 int get_pages(const uint64_t nr, phys_addr_t __directly_mapped *start_addr);
 
+int free_page(const phys_addr_t __directly_mapped addr);
+int free_pages(const uint64_t nr, const phys_addr_t __directly_mapped addr);
+
 #endif /* _HYVEMIND_MM_H */
 
