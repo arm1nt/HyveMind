@@ -156,14 +156,14 @@ init_pf_allocator_metadata(
 }
 
 static inline void
-mark_bitmap_entry(const phys_addr_t addr)
+toggle_bitmap_entry(const phys_addr_t addr)
 {
     const uint64_t pfn = phys_addr_to_pfn(addr);
     const uint64_t byte_index = pfn >> 3;
     const uint64_t bit_index = pfn % 8;
 
     uint8_t *byte = &pf_allocator->bitmap[byte_index];
-    *byte = *byte | U8_LSHIFT(1, bit_index);
+    *byte = *byte ^ U8_RSHIFT(128, bit_index);
 
     pf_allocator->allocated_page_frames++;
 }
@@ -192,7 +192,7 @@ early_init_page_frame_bitmap(struct limine_memmap_response *mem_map, const uint6
          * are page-aligned.
          */
         for (uint64_t j = entry->base; j < entry->base + entry->length; j += PAGE_SIZE) {
-            mark_bitmap_entry(j);
+            toggle_bitmap_entry(j);
         }
     }
 
@@ -203,7 +203,7 @@ early_init_page_frame_bitmap(struct limine_memmap_response *mem_map, const uint6
         + pf_allocator->bitmap_size;
 
     for (uint64_t i = physical_pf_allocator_base; i < pf_allocator_region_limit; i += PAGE_SIZE) {
-        mark_bitmap_entry(i);
+        toggle_bitmap_entry(i);
     }
 
     return 0;
@@ -272,6 +272,11 @@ out_found_area:
     const uint64_t pfn = (area_byte_index << 3) + area_bit_index;
     *start_addr = (pfn_to_phys_addr(pfn) + DIRECT_MAPPING_OFFSET);
 
+    /* Mark pf as used in the bitmap */
+    for(uint64_t i = 0; i < nr; i ++) {
+        toggle_bitmap_entry((*start_addr -DIRECT_MAPPING_OFFSET)+ i*PAGE_SIZE);
+    }
+
     /* Store hint for the next allocation */
     pf_allocator->last_alloc_bit_hint = (area_bit_index + (nr%8)) % 8;
 
@@ -288,7 +293,6 @@ out_found_area:
 
     return 0;
 }
-
 
 int
 early_init_page_frame_allocator(
