@@ -6,6 +6,9 @@
 
 #include <stdint.h>
 
+extern uint64_t direct_mapping_offset;
+#define DIRECT_MAPPING_OFFSET direct_mapping_offset
+
 /* Marker for verbosity */
 #define __directly_mapped
 
@@ -22,6 +25,13 @@ int early_init_page_frame_allocator(
         struct limine_memmap_response * mem_map,
         const uint64_t direct_mapping_offset
 );
+
+/**
+ * Allocate @nr contiguous pages.
+ * Returns 0 on success and the address of the first page is written into
+ * @start_addr. Otherwise, a negative value is returned.
+ */
+int get_pages(const uint64_t nr, phys_addr_t __directly_mapped *start_addr);
 
 #endif /* _HYVEMIND_MM_H */
 
