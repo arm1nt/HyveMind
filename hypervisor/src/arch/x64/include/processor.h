@@ -38,8 +38,8 @@ read_msr(const uint64_t msr_nr)
 static inline void
 write_msr(const uint64_t msr_nr, const uint64_t val)
 {
-    const uint32_t edx = val >> 32;
-    const uint32_t eax = (uint32_t) ((val << 32) >> 32);
+    const uint32_t edx = U64_UPPER32(val);
+    const uint32_t eax = U64_LOWER32(val);
     asm volatile("wrmsr" :: "c"(msr_nr), "d"(edx), "a"(eax));
 }
 
