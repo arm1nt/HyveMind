@@ -1,17 +1,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "fatal.h"
 #include "limine/requests.h"
 #include "mm.h"
 #include "printf.h"
-
-static void __attribute__((noreturn))
-die(void)
-{
-    for (;;) {
-        asm ("hlt");
-    }
-}
 
 #ifdef HYVEMIND_GUEST_CONFIG_FROM_BOOTLOADER
 
