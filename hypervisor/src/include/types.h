@@ -21,7 +21,7 @@
 #define TOGGLE_BIT(val, bit)    (val ^ mask)
 
 #define IS_SET(val, mask)       (val & mask)
-#define IS_CLEAR(val, mask)     (~(val | mask))
+#define IS_CLEAR(val, mask)     ((val & mask) == 0)
 
 #define BUILD_LEFT_SHIFT(type, val, shift)  (((type) val) << shift)
 #define BUILD_RIGHT_SHIFT(type, val, shift) (((type) val) >> shift)
