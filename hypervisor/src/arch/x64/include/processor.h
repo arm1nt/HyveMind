@@ -43,5 +43,30 @@ write_msr(const uint64_t msr_nr, const uint64_t val)
     asm volatile("wrmsr" :: "c"(msr_nr), "d"(edx), "a"(eax));
 }
 
+static inline uint64_t
+read_rflags(void)
+{
+    uint64_t ret;
+
+    asm volatile(
+        "pushfq     \n\t"
+        "pop %0     \n\t"
+        : "=r"(ret)
+    );
+
+    return ret;
+}
+
+static inline void
+write_rflags(uint64_t flags)
+{
+    asm volatile (
+        "push %0    \n\t"
+        "popfq      \n\t"
+        :
+        : "r"(flags)
+    );
+}
+
 #endif /* _HYVEMIND_X64_PROCESSOR_H */
 
