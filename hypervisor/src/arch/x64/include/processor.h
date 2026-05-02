@@ -15,6 +15,7 @@
         asm volatile("mov %0, %%"#reg :: "r"(reg));         \
     }
 
+ACCESS_CONTROL_REGISTER(cr0)
 ACCESS_CONTROL_REGISTER(cr4)
 #undef ACCESS_CONTROL_REGISTER
 
