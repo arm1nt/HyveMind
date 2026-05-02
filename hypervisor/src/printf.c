@@ -14,16 +14,14 @@ u64_to_dec_string(uint64_t num, char *buf)
         num /= 10;
     }
 
-    index--;
-
-    for (int i = 0; i <= (index)/2; i++) {
-        int temp = buf[index-i];
-        buf[index-i] = buf[i];
+    for (int i = 0; i < index/2; i++) {
+        int temp = buf[index-i-1];
+        buf[index-i-1] = buf[i];
         buf[i] = temp;
     }
 
     /* Ensure buf is null terminated */
-    buf[index+1] = '\0';
+    buf[index] = '\0';
 }
 
 static void
@@ -46,16 +44,14 @@ u64_to_hex_string(uint64_t num, char *buf)
         num >>= 4;
     }
 
-    counter--;
-
     for(int i = 0; i < counter/2; i++) {
-        char temp = buf[counter-i];
-        buf[counter-i] = buf[i];
+        char temp = buf[counter-i-1];
+        buf[counter-i-1] = buf[i];
         buf[i] = temp;
     }
 
     /* Ensure buf is null terminated */
-    buf[counter+1] = '\0';
+    buf[counter] = '\0';
 }
 
 int
