@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "arch_init.h"
 #include "fatal.h"
 #include "limine/requests.h"
 #include "mm.h"
@@ -80,6 +81,8 @@ hypervisor_main(void)
     }
 
     printf("(Early-)Initialized the pageframe allocator");
+
+    arch_init();
 
     die();
 }
