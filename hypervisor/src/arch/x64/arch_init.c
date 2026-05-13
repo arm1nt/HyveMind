@@ -1,6 +1,7 @@
 #include "arch_init.h"
 #include "cpufeatures.h"
 #include "fatal.h"
+#include "gdt_idt.h"
 #include "printf.h"
 #include "processor.h"
 
@@ -47,6 +48,11 @@ arch_init(void)
 
     if (check_cpu() != 0) {
         printf("CPU not suited for running hyvemind");
+        die();
+    }
+
+    if (setup_gdt_idt() != 0) {
+        printf("Failed to install IDT and GDT");
         die();
     }
 }
