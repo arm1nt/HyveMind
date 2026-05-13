@@ -15,5 +15,5 @@
 .endm
 
 # Generate the asm trampoline calls for the interrupt handlers
-#include "idt_new.h"
+#include "idt.h"
 
