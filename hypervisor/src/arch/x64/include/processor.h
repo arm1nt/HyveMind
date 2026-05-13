@@ -69,5 +69,39 @@ write_rflags(uint64_t flags)
     );
 }
 
+struct cpuid_result {
+    uint32_t eax;
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+};
+typedef struct cpuid_result cpuid_result_t;
+
+static inline cpuid_result_t
+cpuid(const uint32_t eax, const uint32_t ecx)
+{
+    cpuid_result_t result;
+
+    asm volatile (
+        "cpuid"
+        : "=a"(result.eax), "=b"(result.ebx), "=c"(result.ecx),  "=d"(result.edx)
+        : "a"(eax), "c"(ecx)
+    );
+
+    return result;
+}
+
+static inline void
+enable_local_interrupts(void)
+{
+    // TODO:
+}
+
+static inline void
+disable_local_interrupts(void)
+{
+    // TODO:
+}
+
 #endif /* _HYVEMIND_X64_PROCESSOR_H */
 
