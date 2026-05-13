@@ -144,6 +144,17 @@ struct gdt_struct {
         .rpl = _rpl                                 \
     }
 
+#define INTERRUPT_IDT_BITS                  \
+    (struct idt_bits)                       \
+    {                                       \
+        .zero1 = 0,                         \
+        .zero2 = 0,                         \
+        .dpl = 0,                           \
+        .p = SEGMENT_PRESENT,               \
+        .type = IA32E_INTERRUPT_GATE_TYPE,  \
+        .ist = 0                            \
+    }
+
 static segment_descriptor_t hyvemind_cs_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, SEGMENT_CODE_TYPE_X, 0, 1);
 
