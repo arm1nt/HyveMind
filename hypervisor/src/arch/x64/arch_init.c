@@ -65,7 +65,22 @@ is_genuine_intel(void)
 static inline bool
 all_cpu_features_supported(void)
 {
-    // Check that vmx is supported
+    cpuid_result_t result;
+
+    if (cpuid(0x01, NO_SUBLEAF_INDEX, &result) != 0) {
+        printf("Unable to query CPU feature information as leaf \"0x01\" is not supported");
+        return false;
+    }
+
+    if (IS_CLEAR(result.ecx, CPUID_VMX)) {
+        printf("The CPU does not support the virtual machine extensions!");
+        return false;
+    }
+
+    if (IS_CLEAR(result.edx, CPUID_MSR)) {
+        printf("The CPU does not support the 'rdmsr' and 'wrmsr' instructions");
+        return false;
+    }
 
     return true;
 }
