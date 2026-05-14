@@ -4,8 +4,12 @@
 #include "gdt_idt.h"
 #include "printf.h"
 #include "processor.h"
+#include "string.h"
 
 #include <stdbool.h>
+
+uint32_t max_leaf;
+uint32_t max_extended_leaf;
 
 static bool
 cpuid_supported(void)
@@ -30,11 +34,39 @@ cpuid_supported(void)
     return true;
 }
 
+static inline void
+query_max_leaf_values(void)
+{
+    const cpuid_result_t result = cpuid(0, 0);
+    max_leaf = result.eax;
+}
+
+static inline bool
+is_genuine_intel(void)
+{
+    const cpuid_result_t result = cpuid(0, 0);
+
+    if (memcmp("Genu", (char *) &result.ebx, 4) != 0
+        || memcmp("ineI", (char *) &result.edx, 4) != 0
+        || memcmp("ntel", (char *) &result.ecx, 4) != 0) {
+        return false;
+    }
+
+    return true;
+}
+
 static inline int
 check_cpu(void)
 {
     if (!cpuid_supported()) {
         printf("CPU does not support CPUID");
+        return -1;
+    }
+
+    query_max_leaf_values();
+
+    if (!is_genuine_intel()) {
+        printf("Not a genuine Intel CPU");
         return -1;
     }
 
