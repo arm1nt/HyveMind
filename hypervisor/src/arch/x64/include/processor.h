@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_X64_PROCESSOR_H
 #define _HYVEMIND_X64_PROCESSOR_H
 
+#include "cpufeatures.h"
 #include "types.h"
 #include <stdint.h>
 
@@ -69,6 +70,9 @@ write_rflags(uint64_t flags)
     );
 }
 
+/* Marker to indicate when the ecx value is irrelevant */
+#define NO_SUBLEAF_INDEX 0
+
 struct cpuid_result {
     uint32_t eax;
     uint32_t ebx;
@@ -77,18 +81,38 @@ struct cpuid_result {
 };
 typedef struct cpuid_result cpuid_result_t;
 
+static inline void
+__cpuid(const uint32_t ida, const uint32_t idc, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d)
+{
+    asm volatile (
+            "cpuid"
+            : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+            : "a"(ida), "c"(idc)
+    );
+}
+
+/**
+ * Does not check whether the queried leaf is valid
+ */
 static inline cpuid_result_t
-cpuid(const uint32_t eax, const uint32_t ecx)
+cpuid_raw(const uint32_t eax, const uint32_t ecx)
 {
     cpuid_result_t result;
-
-    asm volatile (
-        "cpuid"
-        : "=a"(result.eax), "=b"(result.ebx), "=c"(result.ecx),  "=d"(result.edx)
-        : "a"(eax), "c"(ecx)
-    );
-
+    __cpuid(eax, ecx, &result.eax, &result.ebx, &result.ecx, &result.edx);
     return result;
+}
+
+static inline int
+cpuid(const uint32_t eax, const uint32_t ecx, cpuid_result_t *result)
+{
+    if ((eax >= cpuid_range_base && eax <= cpuid_max_leaf)
+            || (eax >= cpuid_extended_range_base && eax <= cpuid_max_extended_leaf))
+    {
+        __cpuid(eax, ecx, &result->eax, &result->ebx, &result->ecx, &result->edx);
+        return 0;
+    }
+
+    return -1;
 }
 
 static inline void

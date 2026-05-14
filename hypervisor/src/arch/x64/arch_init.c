@@ -8,8 +8,10 @@
 
 #include <stdbool.h>
 
-uint32_t max_leaf;
-uint32_t max_extended_leaf;
+const uint32_t cpuid_range_base = 0x00;
+uint32_t cpuid_max_leaf;
+const uint32_t cpuid_extended_range_base = 0x80000000;
+uint32_t cpuid_max_extended_leaf;
 
 static bool
 cpuid_supported(void)
@@ -37,20 +39,33 @@ cpuid_supported(void)
 static inline void
 query_max_leaf_values(void)
 {
-    const cpuid_result_t result = cpuid(0, 0);
-    max_leaf = result.eax;
+    cpuid_result_t result;
+
+    result = cpuid_raw(cpuid_range_base, NO_SUBLEAF_INDEX);
+    cpuid_max_leaf = result.eax;
+
+    result = cpuid_raw(cpuid_extended_range_base, NO_SUBLEAF_INDEX);
+    cpuid_max_extended_leaf = result.eax;
 }
 
 static inline bool
 is_genuine_intel(void)
 {
-    const cpuid_result_t result = cpuid(0, 0);
+    const cpuid_result_t result = cpuid_raw(cpuid_range_base, NO_SUBLEAF_INDEX);
 
     if (memcmp("Genu", (char *) &result.ebx, 4) != 0
         || memcmp("ineI", (char *) &result.edx, 4) != 0
         || memcmp("ntel", (char *) &result.ecx, 4) != 0) {
         return false;
     }
+
+    return true;
+}
+
+static inline bool
+all_cpu_features_supported(void)
+{
+    // Check that vmx is supported
 
     return true;
 }
@@ -67,6 +82,11 @@ check_cpu(void)
 
     if (!is_genuine_intel()) {
         printf("Not a genuine Intel CPU");
+        return -1;
+    }
+
+    if (!all_cpu_features_supported()) {
+        printf("Not all required CPU features are supported");
         return -1;
     }
 
@@ -87,5 +107,6 @@ arch_init(void)
         printf("Failed to install IDT and GDT");
         die();
     }
+
 }
 

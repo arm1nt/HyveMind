@@ -3,6 +3,11 @@
 
 #include "types.h"
 
+extern const uint32_t cpuid_range_base;
+extern uint32_t cpuid_max_leaf;
+extern const uint32_t cpuid_extended_range_base;
+extern uint32_t cpuid_max_extended_leaf;
+
 #define EFLAGS_VM_BIT                           17 /* Virtual-8086 mode */
 #define EFLAGS_VM                               U64_LSHIFT(1, EFLAGS_VM_BIT)
 #define EFLAGS_ID_BIT                           21 /* Identification bit */
