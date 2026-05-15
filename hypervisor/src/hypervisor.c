@@ -67,19 +67,17 @@ hypervisor_main(void)
     if (init_printf() != 0) {
         die();
     }
-
     printf("Successfully initialized printf!");
 
     confirm_bootloader_info();
 
     direct_mapping_offset = hhdm_request.response->offset;
-    printf("Set early 'direct_mapping_offset' to value: '%lx'", direct_mapping_offset);
+    printf("Set early 'direct_mapping_offset' to value: '0x%lx'", direct_mapping_offset);
 
-    if (early_init_page_frame_allocator(memmap_request.response, hhdm_request.response->offset) != 0) {
+    if (early_init_page_frame_allocator(memmap_request.response) != 0) {
         printf("Failed to initialize the page frame allocator");
         die();
     }
-
     printf("(Early-)Initialized the pageframe allocator");
 
     arch_init();
