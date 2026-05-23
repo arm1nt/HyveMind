@@ -5,6 +5,7 @@
 #include "printf.h"
 #include "processor.h"
 #include "string.h"
+#include "asm/mm.h"
 
 #include <stdbool.h>
 
@@ -109,7 +110,7 @@ check_cpu(void)
 }
 
 void
-arch_init(void)
+arch_init(const struct limine_memmap_response *mem_map)
 {
     printf("Starting X64 specific initialization...");
 
@@ -123,5 +124,9 @@ arch_init(void)
         die();
     }
 
+    if (init_mm(mem_map) != 0) {
+        printf("Memory management initialization failed");
+        die();
+    }
 }
 

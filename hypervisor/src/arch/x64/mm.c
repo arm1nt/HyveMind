@@ -1,0 +1,54 @@
+#include "printf.h"
+#include "processor.h"
+#include "asm/mm.h"
+#include "asm/paging.h"
+#include "asm/pgtable_types.h"
+
+bool supports_1gb_pages = false;
+uint64_t max_phys_addr;
+
+static inline int
+get_max_phys_addr(void)
+{
+    cpuid_result_t result;
+    if (cpuid(CPUID_MAX_PHYS_ADDR_LEAF, NO_SUBLEAF_INDEX, &result) != 0) {
+        return -1;
+    }
+
+    /* Max phys addr size is stored in bits 0..7 of result.eax */
+    const uint32_t bits = result.eax & ((U32(1) << 8) - 1);
+    max_phys_addr = (U64(1) << bits) - 1;
+
+    return 0;
+}
+
+static inline void
+check_supported_page_sizes(void)
+{
+    cpuid_result_t result;
+    if (cpuid(CPUID_PAGE_1GB_LEAF, NO_SUBLEAF_INDEX, &result) != 0) {
+        /* If feature-info leaf is not valid, assume 1GB pages are not supported */
+        return;
+    }
+
+    if (IS_SET(result.edx, CPUID_PAGE_1GB)) {
+        supports_1gb_pages = true;
+    }
+}
+
+int
+init_mm(const struct limine_memmap_response *mem_map)
+{
+    printf("Starting X64 specific memory management initialization...");
+
+    if (get_max_phys_addr() != 0) {
+        printf("Unable to query the max physical addr size supported");
+        return -1;
+    }
+
+    check_supported_page_sizes();
+
+
+    return 0;
+}
+

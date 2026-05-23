@@ -80,7 +80,7 @@ hypervisor_main(void)
     }
     printf("(Early-)Initialized the pageframe allocator");
 
-    arch_init();
+    arch_init(memmap_request.response);
 
     die();
 }
