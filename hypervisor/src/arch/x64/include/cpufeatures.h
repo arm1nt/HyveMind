@@ -8,12 +8,20 @@ extern uint32_t cpuid_max_leaf;
 extern const uint32_t cpuid_extended_range_base;
 extern uint32_t cpuid_max_extended_leaf;
 
+#define CPUID_BASE_RANGE_LIMITS_LEAF            0x00
+#define CPUID_EXTENDED_RANGE_LIMITS_LEAF        0x80000000
+#define CPUID_BRAND_STRING_LEAF                 0x00
+#define CPUID_CPU_FEATURES_LEAF                 0x01
+#define CPUID_PAGE_1GB_LEAF                     0x80000001
+#define CPUID_MAX_PHYS_ADDR_LEAF                0x80000008
+
 #define CPUID_VMX_BIT                           5 /* cpuid_result.ecx */
 #define CPUID_VMX                               (U32(1) << CPUID_VMX_BIT)
 #define CPUID_MSR_BIT                           5 /* cpuid_result.edx */
 #define CPUID_MSR                               (U32(1) << CPUID_MSR_BIT)
-#define CPUID_PAGE_1GB_BIT                      26
+#define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
+
 
 #define EFLAGS_VM_BIT                           17 /* Virtual-8086 mode */
 #define EFLAGS_VM                               U64_LSHIFT(1, EFLAGS_VM_BIT)

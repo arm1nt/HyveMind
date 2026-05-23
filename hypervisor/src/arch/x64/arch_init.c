@@ -42,17 +42,17 @@ query_max_leaf_values(void)
 {
     cpuid_result_t result;
 
-    result = cpuid_raw(cpuid_range_base, NO_SUBLEAF_INDEX);
+    result = cpuid_raw(CPUID_BASE_RANGE_LIMITS_LEAF, NO_SUBLEAF_INDEX);
     cpuid_max_leaf = result.eax;
 
-    result = cpuid_raw(cpuid_extended_range_base, NO_SUBLEAF_INDEX);
+    result = cpuid_raw(CPUID_EXTENDED_RANGE_LIMITS_LEAF, NO_SUBLEAF_INDEX);
     cpuid_max_extended_leaf = result.eax;
 }
 
 static inline bool
 is_genuine_intel(void)
 {
-    const cpuid_result_t result = cpuid_raw(cpuid_range_base, NO_SUBLEAF_INDEX);
+    const cpuid_result_t result = cpuid_raw(CPUID_BRAND_STRING_LEAF, NO_SUBLEAF_INDEX);
 
     if (memcmp("Genu", (char *) &result.ebx, 4) != 0
         || memcmp("ineI", (char *) &result.edx, 4) != 0
@@ -68,7 +68,7 @@ all_cpu_features_supported(void)
 {
     cpuid_result_t result;
 
-    if (cpuid(0x01, NO_SUBLEAF_INDEX, &result) != 0) {
+    if (cpuid(CPUID_CPU_FEATURES_LEAF, NO_SUBLEAF_INDEX, &result) != 0) {
         printf("Unable to query CPU feature information as leaf \"0x01\" is not supported");
         return false;
     }
