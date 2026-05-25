@@ -7,7 +7,11 @@
 extern uint64_t max_phys_addr;
 #define MAX_PHYS_ADDR max_phys_addr;
 
-int init_mm(const struct limine_memmap_response *mem_map);
+int
+init_mm(
+        const struct limine_memmap_response *mem_map,
+        const struct limine_executable_address_response *exec_addr_info
+);
 
 #endif /* _HYVEMIND_X64_ASM_MM_H */
 

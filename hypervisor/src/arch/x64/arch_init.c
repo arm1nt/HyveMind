@@ -110,7 +110,10 @@ check_cpu(void)
 }
 
 void
-arch_init(const struct limine_memmap_response *mem_map)
+arch_init(
+        const struct limine_memmap_response *mem_map,
+        const struct limine_executable_address_response *exec_addr_info
+)
 {
     printf("Starting X64 specific initialization...");
 
@@ -124,9 +127,10 @@ arch_init(const struct limine_memmap_response *mem_map)
         die();
     }
 
-    if (init_mm(mem_map) != 0) {
+    if (init_mm(mem_map, exec_addr_info) != 0) {
         printf("Memory management initialization failed");
         die();
     }
+
 }
 
