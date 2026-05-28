@@ -44,6 +44,7 @@ init_system_memory_info(const struct limine_memmap_response *mem_map)
     sys_mem_info.highest_mapped_addr = highest_mapped_paddr;
 
     const uint64_t largest_pfn = phys_to_pfn(highest_mapped_paddr);
+    sys_mem_info.largest_mapped_pfn = largest_pfn;
     /* Account for pfn '0' */
     sys_mem_info.nr_of_pfns = largest_pfn + 1;
 

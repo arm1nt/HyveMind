@@ -13,6 +13,7 @@ struct system_memory_info {
     phys_addr_t lowest_mapped_addr;
     phys_addr_t highest_mapped_addr;
 
+    uint64_t largest_mapped_pfn;
     /* That covers the area from first mapped addr to last mapped addr, including holes */
     uint64_t nr_of_pfns;
 };
