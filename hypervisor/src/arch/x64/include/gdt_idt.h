@@ -2,7 +2,7 @@
 #define _HYVEMIND_X64_GDT_IDT_H
 
 #include "types.h"
-#include "mm.h"
+#include "asm/paging.h"
 #include <stdint.h>
 
 enum {
