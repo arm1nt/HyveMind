@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_X64_ASM_PAGING_H
 #define _HYVEMIND_X64_ASM_PAGING_H
 
+#include "types.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -25,6 +26,9 @@ extern uint64_t hypervisor_direct_mapping_offset;
 #define phys_to_virt(addr) __phys_to_virt(addr, HYPERVISOR_DIRECT_MAPPING_OFFSET)
 #define __virt_to_phys(addr, offset) ((addr) - (offset))
 #define virt_to_phys(addr) __virt_to_phys(addr, HYPERVISOR_DIRECT_MAPPING_OFFSET)
+
+#define phys_to_pfn(paddr)  (U64_RSHIFT(paddr, PAGE_SHIFT))
+#define pfn_to_phys(pfn)    (U64_LSHIFT(pfn, PAGE_SHIFT))
 
 #endif /* _HYVEMIND_X64_ASM_PAGING_H */
 
