@@ -51,7 +51,7 @@ init_system_memory_info(const struct limine_memmap_response *mem_map)
     return &sys_mem_info;
 }
 
-inline const sys_mem_info_t *
+const sys_mem_info_t *
 get_system_memory_info(void)
 {
     return &sys_mem_info;

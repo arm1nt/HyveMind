@@ -5,6 +5,7 @@
 #include "fatal.h"
 #include "limine/requests.h"
 #include "mm.h"
+#include "phys_mm.h"
 #include "asm/paging.h"
 #include "printf.h"
 
@@ -75,6 +76,8 @@ hypervisor_main(void)
     direct_mapping_offset = hhdm_request.response->offset;
     printf("Set early 'direct_mapping_offset' to value: '0x%lx'", direct_mapping_offset);
     early_direct_mapping_offset = direct_mapping_offset;
+
+    init_system_memory_info(memmap_request.response);
 
     if (early_init_page_frame_allocator(memmap_request.response) != 0) {
         printf("Failed to initialize the page frame allocator");

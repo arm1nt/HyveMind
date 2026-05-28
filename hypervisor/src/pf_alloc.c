@@ -1,6 +1,7 @@
 #include "mm.h"
 #include "limine/helpers.h"
 #include "printf.h"
+#include "phys_mm.h"
 #include "string.h"
 
 #include <stddef.h>
@@ -24,22 +25,6 @@ struct pf_bitmap_allocator {
     uint64_t allocated_page_frames;
 };
 
-/**
- * @total_size ... Total size of existing memory
- * @early_usable_memory ... Total size of early usable memory
- * @total_usable_memory ... Total size of theoretically usable memory
- */
-struct system_memory_info {
-    uint64_t total_size;
-    uint64_t early_usable_memory;
-    uint64_t total_usable_memory;
-
-    phys_addr_t lowest_mapped_mem_addr;
-    phys_addr_t highest_mapped_mem_addr;
-};
-
-
-static struct system_memory_info sys_mem_info;
 static struct pf_bitmap_allocator *pf_allocator = NULL;
 
 static void
@@ -61,51 +46,6 @@ print_limine_memory_map(const struct limine_memmap_response *mem_map)
 
         counter++;
     }
-}
-
-static int
-get_system_memory_info(
-        const struct limine_memmap_response *mem_map,
-        struct system_memory_info *mem_info
-)
-{
-    uint64_t total_size = 0;
-    uint64_t early_usable_size = 0;
-    uint64_t total_usable_size = 0;
-
-    phys_addr_t lowest_mapped = ~((phys_addr_t) 0);
-    phys_addr_t highest_mapped = 0;
-
-    struct limine_memmap_entry *entry;
-
-    for (uint64_t i = 0; i < mem_map->entry_count; i++) {
-        entry = mem_map->entries[i];
-
-        lowest_mapped = (entry->base < lowest_mapped)
-            ? entry->base
-            : lowest_mapped;
-
-        highest_mapped = ((entry->base + entry->length -1) > highest_mapped)
-            ? (entry->base + entry->length - 1)
-            : highest_mapped;
-
-        total_size += entry->length;
-
-        if (entry->type == LIMINE_MEMMAP_USABLE) {
-            early_usable_size += entry->length;
-            total_usable_size += entry->length;
-        } else if (entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE) {
-            total_usable_size += entry->length;
-        }
-    }
-
-    mem_info->total_size = total_size;
-    mem_info->early_usable_memory = early_usable_size;
-    mem_info->total_usable_memory = total_usable_size;
-    mem_info->lowest_mapped_mem_addr = lowest_mapped;
-    mem_info->highest_mapped_mem_addr = highest_mapped;
-
-    return 0;
 }
 
 static int
@@ -141,7 +81,7 @@ init_pf_allocator_metadata(
         const virt_addr_t __directly_mapped allocator_region,
         const uint64_t region_size,
         const uint64_t bitmap_length,
-        const struct system_memory_info *mem_info
+        const sys_mem_info_t *mem_info
 )
 {
     pf_allocator = (struct pf_bitmap_allocator *) allocator_region;
@@ -231,17 +171,9 @@ early_init_page_frame_allocator(const struct limine_memmap_response *mem_map)
 {
     print_limine_memory_map(mem_map);
 
-    struct system_memory_info mem_info;
-    memset(&mem_info, 0, sizeof(struct system_memory_info));
+    const sys_mem_info_t *mem_info = get_system_memory_info();
 
-    if (get_system_memory_info(mem_map, &mem_info) != 0) {
-        printf("Unable to obtain system memory information");
-        return -1;
-    }
-
-    const uint64_t largest_pfn = phys_to_pfn(mem_info.highest_mapped_mem_addr);
-    /* Need to account for pfn 0 */
-    const uint64_t nr_of_pfns = largest_pfn + 1;
+    const uint64_t nr_of_pfns = mem_info->nr_of_pfns;
     /* Nr of bytes needed so that we can fit 1 bit per pfn */
     const uint64_t bitmap_size = (nr_of_pfns >> 3) + (nr_of_pfns % 8 != 0);
     const uint64_t allocator_region_size = sizeof(struct pf_bitmap_allocator) + bitmap_size;
@@ -262,10 +194,10 @@ early_init_page_frame_allocator(const struct limine_memmap_response *mem_map)
             pf_allocator_region,
             allocator_region_size,
             bitmap_size,
-            &mem_info
+            mem_info
     );
 
-    if (early_initialize_pf_bitmap(mem_map, largest_pfn) != 0) {
+    if (early_initialize_pf_bitmap(mem_map, mem_info->largest_mapped_pfn) != 0) {
         printf("Failed to initialize the page frame allocator bitmap");
         return -1;
     }
