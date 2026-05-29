@@ -3,6 +3,7 @@
 
 #include "arch_init.h"
 #include "fatal.h"
+#include "halloc.h"
 #include "limine/requests.h"
 #include "pf_alloc.h"
 #include "phys_mm.h"
@@ -85,6 +86,12 @@ hypervisor_main(void)
     printf("(Early-)Initialized the pageframe allocator");
 
     arch_init(memmap_request.response, exec_addr_request.response);
+
+    if (init_ptfl_allocator() != 0) {
+        printf("Failed to initialize the hypervisor's memory allocator");
+        die();
+    }
+    printf("Successfully inintialized the memory allocator!");
 
     die();
 }
