@@ -76,7 +76,6 @@ pt_map_range(
 )
 {
     int ret = 0;
-
     const virt_addr_t vaddr_start = __phys_to_virt(start, mapping_info->target_offset);
     const virt_addr_t vaddr_end = __phys_to_virt(end, mapping_info->target_offset);
     virt_addr_t curr_vaddr_start = vaddr_start;
@@ -109,7 +108,6 @@ pdt_map_range(
 )
 {
     int ret = 0;
-
     const virt_addr_t vaddr_start = __phys_to_virt(start, mapping_info->target_offset);
     const virt_addr_t vaddr_end = __phys_to_virt(end, mapping_info->target_offset);
     virt_addr_t curr_vaddr_start = vaddr_start;
@@ -151,11 +149,9 @@ pdt_map_range(
 
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
-
 do_mb_mapping:
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
-
 skip_pdt_mapping:
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
@@ -173,7 +169,6 @@ pdpt_map_range(
 )
 {
     int ret = 0;
-
     const virt_addr_t vaddr_start = __phys_to_virt(start, mapping_info->target_offset);
     const virt_addr_t vaddr_end = __phys_to_virt(end, mapping_info->target_offset);
     virt_addr_t curr_vaddr_start = vaddr_start;
@@ -223,11 +218,9 @@ do_mapping_via_pdt:
 
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
-
 do_gb_mapping:
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
-
 skip_pdpt_mapping:
         curr_vaddr_start = curr_vaddr_end + 1;
         continue;
@@ -245,7 +238,6 @@ pml4_map_range(
 )
 {
     int ret = 0;
-
     const virt_addr_t vaddr_start = __phys_to_virt(start, mapping_info->target_offset);
     const virt_addr_t vaddr_end = __phys_to_virt(end, mapping_info->target_offset);
     virt_addr_t curr_vaddr_start = vaddr_start;
