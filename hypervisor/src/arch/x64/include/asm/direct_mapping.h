@@ -5,34 +5,35 @@
 #include "mm_types.h"
 #include "asm/pgtable_types.h"
 
-/**
- * Necessary to replace a direct mapping already in place
- */
 struct mapping_info {
-    uint64_t curr_offset;
+    struct cr3 *addr_space;
     uint64_t target_offset;
+    uint64_t curr_offset;
+    uint64_t ps_flags;
+    uint64_t nops_flags;
 };
 
 int
-directly_map_range(
-        struct cr3 *addr_space,
+directly_map_phys_range(
         const struct mapping_info *mapping_info,
         const phys_addr_t start,
         const phys_addr_t end
 );
 
+/**
+ * Does not check whether the available physical memory fits into the virtual
+ * address space range allocated for the direct mapping
+ */
 int
-directly_map_from_memory_map(
-        struct cr3 *addr_space,
-        const struct limine_memmap_response *mem_map,
-        const struct mapping_info *mapping_info
+raw_setup_direct_mapping_from_memmap(
+        const struct mapping_info *mapping_info,
+        const struct limine_memmap_response *mem_map
 );
 
 int
-early_setup_direct_mapping(
-        struct cr3 *addr_space,
-        const struct limine_memmap_response *mem_map,
-        const struct mapping_info *mapping_info
+setup_direct_mapping_from_memmap(
+        const struct mapping_info *mapping_info,
+        const struct limine_memmap_response *mem_map
 );
 
 #endif /* _HYVEMIND_X64_ASM_DIRECT_MAPPING_H */

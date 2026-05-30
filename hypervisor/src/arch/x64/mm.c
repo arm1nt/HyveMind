@@ -46,15 +46,18 @@ _early_setup_direct_mapping(
         const struct limine_executable_address_response *exec_addr_info
 )
 {
-    const struct mapping_info mapping_info = {
-        .curr_offset = EARLY_DIRECT_MAPPING_OFFSET,
-        .target_offset = HYPERVISOR_DIRECT_MAPPING_OFFSET
-    };
-
     struct cr3 new_addr_space;
     memset(&new_addr_space, 0, sizeof(struct cr3));
 
-    if (early_setup_direct_mapping(&new_addr_space, mem_map, &mapping_info) != 0) {
+    const struct mapping_info mapping_info = {
+        .addr_space = &new_addr_space,
+        .curr_offset = EARLY_DIRECT_MAPPING_OFFSET,
+        .target_offset = HYPERVISOR_DIRECT_MAPPING_OFFSET,
+        .ps_flags = PGTABLE_RW,
+        .nops_flags = PGTABLE_RW
+    };
+
+    if (setup_direct_mapping_from_memmap(&mapping_info, mem_map) != 0) {
         return -1;
     }
 
@@ -66,16 +69,19 @@ _early_setup_direct_mapping(
 
     /* todo: do properly */
     const struct mapping_info scnd = {
+        .addr_space = &new_addr_space,
         .curr_offset = EARLY_DIRECT_MAPPING_OFFSET,
-        .target_offset = exec_addr_info->virtual_base - exec_addr_info->physical_base
+        .target_offset = exec_addr_info->virtual_base - exec_addr_info->physical_base,
+        .ps_flags = PGTABLE_RW,
+        .nops_flags = PGTABLE_RW
     };
-    directly_map_range(
-            &new_addr_space,
+
+    directly_map_phys_range(
             &scnd,
             exec_addr_info->physical_base,
             exec_addr_info->physical_base + (0xa000-1));
 
-    const  uint64_t *cr3_flattened = (uint64_t *) &new_addr_space;
+    const uint64_t *cr3_flattened = (uint64_t *) &new_addr_space;
     write_cr3(*cr3_flattened);
 
     /* need to change the return instruction pointer when the offset of the
