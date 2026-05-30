@@ -9,7 +9,9 @@ int get_page_raw(phys_addr_t *pf_addr);
 int get_pages_raw(const uint64_t nr, phys_addr_t *start_pf_addr);
 /* Same as their '.._raw' counterparts, but returns directly mapped virtual addresses */
 int get_page(virt_addr_t __directly_mapped *addr);
+int get_page_zeroed(virt_addr_t __directly_mapped *addr);
 int get_pages(const uint64_t nr, virt_addr_t __directly_mapped *start_addr);
+int get_pages_zeroed(const uint64_t nr, virt_addr_t __directly_mapped *start_addr);
 
 int free_page_raw(const phys_addr_t addr);
 int free_pages_raw(const uint64_t nr, const phys_addr_t addr);

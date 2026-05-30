@@ -8,6 +8,11 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+/**
+ * todo: replace with / add a binary-buddy allocator that maintains an array of
+ * page structs and move the page struct array out of halloc.
+ */
+
 #undef PRINT_PREFIX_NAME
 #define PRINT_PREFIX_NAME "pf-allocator"
 
@@ -25,6 +30,7 @@ struct pf_bitmap_allocator {
 
 static struct pf_bitmap_allocator *pf_allocator = NULL;
 
+/* todo: move this printing logic somewhere else */
 static void
 print_limine_memory_map(const struct limine_memmap_response *mem_map)
 {
@@ -326,6 +332,18 @@ get_page(virt_addr_t __directly_mapped *addr)
     return get_pages(1, addr);
 }
 
+int
+get_page_zeroed(virt_addr_t __directly_mapped *addr)
+{
+    int ret = get_page(addr);
+    if (ret != 0) {
+        return ret;
+    }
+
+    memset(addr, 0, PAGE_SIZE);
+    return 0;
+}
+
 inline int
 get_pages(const uint64_t nr, virt_addr_t __directly_mapped *start_addr)
 {
@@ -336,6 +354,18 @@ get_pages(const uint64_t nr, virt_addr_t __directly_mapped *start_addr)
     }
 
     *start_addr = phys_to_virt(phys_addr);
+    return 0;
+}
+
+int
+get_pages_zeroed(const uint64_t nr, virt_addr_t __directly_mapped *start_addr)
+{
+    int ret = get_pages(nr, start_addr);
+    if (ret != 0) {
+        return ret;
+    }
+
+    memset(start_addr, 0, nr << PAGE_SHIFT);
     return 0;
 }
 
