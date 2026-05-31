@@ -86,6 +86,45 @@ all_cpu_features_supported(void)
     return true;
 }
 
+static inline bool
+vmx_operation_enableable(void)
+{
+    uint64_t ftr_ctrl = read_msr(MSRX64_IA32_FEATURE_CONTROL_MSR);
+
+    if (IS_SET(ftr_ctrl, MSRX64_FTR_CTRL_LOCKED)) {
+
+        if (IS_CLEAR(ftr_ctrl, MSRX64_FTR_CTRL_VMX_IN_SMX)) {
+            printf("VMX operation cannot be enabled inside of SMX operation");
+        }
+
+        if (IS_CLEAR(ftr_ctrl, MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX)) {
+            printf(
+                    "Feature lock bit is already set and VMX operation is "
+                    "configured to be prohibited outside of SMX operation"
+            );
+            return false;
+        }
+
+        return true;
+    } else {
+        /**
+         * If the supported feature selection is not yet locked, make sure
+         * VMX operation is supported in any case and then lock the selection
+         */
+        ftr_ctrl = SET_BIT(
+                ftr_ctrl,
+                MSRX64_FTR_CTRL_VMX_IN_SMX
+                | MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX
+                | MSRX64_FTR_CTRL_LOCKED
+        );
+
+        write_msr(MSRX64_IA32_FEATURE_CONTROL_MSR, ftr_ctrl);
+        return true;
+    }
+
+    return false;
+}
+
 static inline int
 check_cpu(void)
 {
@@ -103,6 +142,11 @@ check_cpu(void)
 
     if (!all_cpu_features_supported()) {
         printf("Not all required CPU features are supported");
+        return -1;
+    }
+
+    if (!vmx_operation_enableable()) {
+        printf("VMX operation disabled by bootloader!");
         return -1;
     }
 
