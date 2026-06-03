@@ -1,9 +1,8 @@
+#include "types.h"
 #include "gdt_idt.h"
 #include "idt.h"
 #include "string.h"
 #include "printf.h"
-
-extern void reload_cs_register(segment_selector_t cs_selector);
 
 static struct gdt_struct gdt;
 static struct idt_struct idt;
@@ -18,6 +17,15 @@ void
 c_double_fault_handler(void)
 {
     printf("Inside the c_double_fault_handler function");
+}
+
+static inline void
+set_idt_gate_offset(idt_gate_t *gate, const uint64_t offset)
+{
+    const uint32_t lower32 = U64_LOWER32(offset);
+    gate->low_offset = U32_LOWER16(lower32);
+    gate->mid_offset = U32_UPPER16(lower32);
+    gate->high_offset = U64_UPPER32(offset);
 }
 
 static idt_gate_t
@@ -64,13 +72,6 @@ setup_idt(void)
     load_idt(&idt);
 }
 
-static void __attribute__((noinline))
-reload_segment_registers(const struct segment_regs *regs)
-{
-    reload_cs_register(regs->cs);
-    asm volatile ("mov %0, %%ss" :: "m"(regs->ss));
-}
-
 static inline void
 load_gdt(const struct gdt_struct *gdt)
 {
@@ -99,7 +100,7 @@ setup_gdt(void)
     reload_segment_registers(&regs);
 }
 
-int inline
+int
 setup_gdt_idt(void)
 {
     setup_gdt();
