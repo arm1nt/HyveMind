@@ -340,7 +340,7 @@ get_page_zeroed(virt_addr_t __directly_mapped *addr)
         return ret;
     }
 
-    memset(addr, 0, PAGE_SIZE);
+    memset((void *) *addr, 0, PAGE_SIZE);
     return 0;
 }
 
@@ -365,7 +365,7 @@ get_pages_zeroed(const uint64_t nr, virt_addr_t __directly_mapped *start_addr)
         return ret;
     }
 
-    memset(start_addr, 0, nr << PAGE_SHIFT);
+    memset((void *) *start_addr, 0, nr << PAGE_SHIFT);
     return 0;
 }
 
