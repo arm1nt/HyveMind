@@ -10,7 +10,15 @@ void
 reload_segment_registers(const struct segment_regs *regs)
 {
     reload_cs_register(regs->cs);
-    asm volatile ("mov %0, %%ss" :: "rm"(regs->ss));
+
+    asm volatile (
+            "mov %0, %%ss\n\t"
+            "mov %1, %%ds\n\t"
+            "mov %2, %%es\n\t"
+            "mov %2, %%fs\n\t"
+            "mov %2, %%gs\n\t"
+            :: "rm"(regs->ss), "rm"(regs->ds), "rm"(regs->es), "rm"(regs->fs), "rm"(regs->gs)
+    );
 }
 
 inline void
