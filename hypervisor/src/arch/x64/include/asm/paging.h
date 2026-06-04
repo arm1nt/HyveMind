@@ -38,6 +38,12 @@ is_aligned(const uint64_t val, const int alignment)
 }
 
 static inline uint64_t
+align_down(const uint64_t val, const int alignment)
+{
+    return (val >> alignment) << alignment;
+}
+
+static inline uint64_t
 align_forward(const uint64_t val, const int alignment)
 {
     int mod = val % alignment;
