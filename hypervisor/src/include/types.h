@@ -10,6 +10,8 @@
 #define U32(val)    ((uint32_t) (val))
 #define U64(val)    ((uint64_t) (val))
 
+#define U16_LOWER8(val)     ((val) & ((1 << 8) - 1))
+#define U16_UPPER8(val)     ((val) >> 8)
 #define U32_UPPER16(val)    (U16(val >> 16))
 #define U32_LOWER16(val)    (U16((val << 16) >> 16))
 #define U64_UPPER32(val)    (U32(val >> 32))
