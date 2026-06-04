@@ -2,16 +2,18 @@
 #define _HYVEMIND_X64_ASM_SEGMENTATION_H
 
 #include <stdint.h>
+#include <asm/tss.h>
 
 enum {
-    TABLE_INDICATOR_GDT = 0,
-    TABLE_INDICATOR_IDT = 1,
+    TI_GDT = 0,
+    TI_LDT = 1,
 };
 
-enum {
+enum descriptor_type {
     SYSTEM_SEGMENT_DESC     = 0,
     CODE_DATA_SEGMENT_DESC  = 1,
 };
+typedef  enum descriptor_type desc_type_t;
 
 enum {
     SEGMENT_NOT_PRESENT = 0,
@@ -41,6 +43,7 @@ typedef enum code_data_segment_type code_data_seg_type_t;
 
 enum system_segment_type {
     IA32E_LDT               = 2,
+    IA32E_TSS               = 9,
     IA32E_INTERRUPT_GATE    = 14,
     IA32E_TRAP_GATE         = 15,
 };
@@ -104,6 +107,8 @@ struct segment_regs {
 };
 
 void reload_segment_registers(const struct segment_regs *regs);
+
+void reload_tr_register(const segment_selector_t *selector);
 
 segment_selector_t get_cs(void);
 

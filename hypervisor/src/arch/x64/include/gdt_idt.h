@@ -35,48 +35,35 @@ struct gdt_ptr {
 } __attribute__((packed));
 typedef struct gdt_ptr gdt_ptr_t;
 
+#define HYVEMIND_CS_SEGMENT_INDEX       1
+#define HYVEMIND_DATA_SEGMENT_INDEX     2
+#define HYVEMIND_TSS_INDEX              3
+
+#define GDT_ENTRIES 5
+
 #define IDT_ENTRIES 256
-#define GDT_ENTRIES 3
 
 struct idt_struct {
-    idt_gate_t gates[IDT_ENTRIES];
+    uint64_t gates[IDT_ENTRIES];
 } __attribute__((aligned(PAGE_SIZE)));
 
 struct gdt_struct {
-    segment_descriptor_t gdt[GDT_ENTRIES];
+    uint64_t gdt[GDT_ENTRIES];
 } __attribute__((aligned(PAGE_SIZE)));
 
-#define GDT_LIMIT(x) ((x*8)-1)
-#define IDT_LIMIT(x) ((x*16)-1)
+#define GDT_LIMIT(x) (((x)*8)-1)
+#define IDT_LIMIT(x) (((x)*16)-1)
 
-#define INTERRUPT_IDT_BITS                  \
-    (struct idt_bits)                       \
-    {                                       \
-        .zero1 = 0,                         \
-        .zero2 = 0,                         \
-        .dpl = 0,                           \
-        .p = SEGMENT_PRESENT,               \
-        .type = IA32E_INTERRUPT_GATE,       \
-        .ist = 0                            \
-    }
+#define GDT_SELECTOR(_index, _ti, _rpl) \
+    DEFINE_SEGMENT_SELECTOR(_index, _ti, _rpl)
 
-#define HYVEMIND_CS_SEGMENT_INDEX   1
-#define HYVEMIND_DATA_SEGMENT_INDEX 2
-#define HYVEMIND_TSS_INDEX          3
+#define GDT_NULL_SELECTOR GDT_SELECTOR(0, 0, 0)
 
 static segment_descriptor_t hyvemind_cs_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, CODE_EXECUTE_ONLY, 0, 1);
 
 static segment_descriptor_t hyvemind_data_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, DATA_RW_EXPAND_DOWN, 0, 0);
-
-static segment_selector_t hyvemind_cs_selector =
-    DEFINE_SEGMENT_SELECTOR(HYVEMIND_CS_SEGMENT_INDEX, TABLE_INDICATOR_GDT, 0);
-
-static segment_selector_t hyvemind_data_selector =
-    DEFINE_SEGMENT_SELECTOR(HYVEMIND_DATA_SEGMENT_INDEX, TABLE_INDICATOR_GDT, 0);
-
-static segment_selector_t gdt_null_selector = DEFINE_SEGMENT_SELECTOR(0, 0, 0);
 
 int setup_gdt_idt(void);
 
