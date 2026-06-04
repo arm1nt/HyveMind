@@ -36,8 +36,8 @@ struct tss {
     TSS_RSP_ENTRY(rsp0);
     TSS_RSP_ENTRY(rsp1);
     TSS_RSP_ENTRY(rsp2);
-    uint64_t reserved1;
-    uint64_t reserved2;
+    uint32_t reserved1;
+    uint32_t reserved2;
     TSS_IST_ENTRY(ist1);
     TSS_IST_ENTRY(ist2);
     TSS_IST_ENTRY(ist3);
