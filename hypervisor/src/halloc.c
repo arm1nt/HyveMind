@@ -1,7 +1,6 @@
 /**
  * Power-of-two freelist allocator built on top of the page-frame allocator.
  */
-
 #include "halloc.h"
 #include "halloc_internal.h"
 #include "hyvstdlib.h"
