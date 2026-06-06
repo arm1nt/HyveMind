@@ -1,7 +1,12 @@
-#include "printf.h"
 #include "console.h"
+#include "printf.h"
+#include "spinlock.h"
 
 #include <stdarg.h>
+
+DEFINE_SPINLOCK(global_print_lock);
+
+/* TODO: add feature to flush the send buffer */
 
 static dbg_console_t console = { .initialized = 0 };
 
@@ -61,6 +66,8 @@ __printf(const char *fmt, ...)
         return -1;
     }
 
+    spinlock_acquire(&global_print_lock);
+
     char c;
     uint64_t index = 0;
     va_list args;
@@ -113,6 +120,8 @@ __printf(const char *fmt, ...)
         }
 
     }
+
+    spinlock_release(&global_print_lock);
 
     /* TODO: return the number of characters written */
     return 0;
