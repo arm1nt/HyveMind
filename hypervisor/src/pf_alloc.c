@@ -3,6 +3,7 @@
 #include "pf_alloc.h"
 #include "phys_mm.h"
 #include "string.h"
+#include "spinlock.h"
 #include "asm/paging.h"
 
 #include <stddef.h>
@@ -15,6 +16,8 @@
 
 #undef PRINT_PREFIX_NAME
 #define PRINT_PREFIX_NAME "pf-allocator"
+
+DEFINE_SPINLOCK(global_pfalloc_lock);
 
 struct pf_bitmap_allocator {
     uint8_t *bitmap;
@@ -235,10 +238,13 @@ early_init_page_frame_allocator(
 static int
 __get_pages(const uint64_t nr, phys_addr_t *start_addr)
 {
+    spinlock_acquire(&global_pfalloc_lock);
+
     const uint64_t free_frames =
         pf_allocator->allocatable_frames - pf_allocator->allocated_page_frames;
 
     if (nr == 0 || nr > free_frames) {
+        spinlock_release(&global_pfalloc_lock);
         return -1;
     }
 
@@ -286,6 +292,7 @@ __get_pages(const uint64_t nr, phys_addr_t *start_addr)
         }
     }
 
+    spinlock_release(&global_pfalloc_lock);
     return -1;
 
 out_found_area:
@@ -311,6 +318,7 @@ out_found_area:
             (area_byte_index + byte_hint_offset) % pf_allocator->bitmap_size;
     }
 
+    spinlock_release(&global_pfalloc_lock);
     return 0;
 }
 
@@ -378,8 +386,10 @@ free_page_raw(const phys_addr_t addr)
 inline int
 free_pages_raw(const uint64_t nr, const phys_addr_t addr)
 {
+    spinlock_acquire(&global_pfalloc_lock);
     clear_bitmap_region(addr, nr);
     freed_nr_frames(nr);
+    spinlock_release(&global_pfalloc_lock);
     return 0;
 }
 
