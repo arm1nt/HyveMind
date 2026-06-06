@@ -8,6 +8,7 @@
 #include "phys_mm.h"
 #include "printf.h"
 #include "string.h"
+#include "spinlock.h"
 #include "asm/paging.h"
 
 #ifndef HALLOC_DEFAULT_ALIGNMENT
@@ -20,6 +21,8 @@
  * the page frame allocator already, this is a sensible limit.
  */
 #define MAX_SUPPORTED_ALLOCATION_SIZE (1 << (12 + 8))
+
+DEFINE_SPINLOCK(global_halloc_lock);
 
 struct alloc_page {
     halloc_flags_t halloc_flags;
@@ -149,10 +152,14 @@ pf_fallback_allocation(const size_t req)
         return NULL;
     }
 
+    spinlock_acquire(&global_halloc_lock);
+
     const pfn_t pfn = phys_to_pfn(virt_to_phys(pages_start));
     struct alloc_page *page = &ptfl_allocator.alloc_pages_array[pfn];
     page->contig_allocated = pages_needed;
     page->halloc_flags = HALLOC_FLAGS_PAGE_GRANULARITY | HALLOC_FLAGS_MANAGED;
+
+    spinlock_release(&global_halloc_lock);
 
     return (void *) pages_start;
 }
@@ -182,6 +189,8 @@ hmalloc_align(const size_t req, const uint8_t alignment)
 
         return pf_fallback_allocation(actual_req);
     } else {
+        spinlock_acquire(&global_halloc_lock);
+
         const struct bin_config *bin_config = &bin_configs[bin_index];
 
         free_chunk_hdr_t *header = (free_chunk_hdr_t *) ptfl_allocator.bins[bin_index];
@@ -194,6 +203,8 @@ hmalloc_align(const size_t req, const uint8_t alignment)
 
         ptfl_allocator.bins[bin_index] = (uintptr_t) header->next;
         memset((void *) header, 0, 1 << (bin_config->chunk_shift));
+
+        spinlock_release(&global_halloc_lock);
         return (void *) header;
     }
 
@@ -203,12 +214,13 @@ hmalloc_align(const size_t req, const uint8_t alignment)
 void
 hfree(const void *ptr)
 {
+    spinlock_acquire(&global_halloc_lock);
     const pfn_t pfn = phys_to_pfn(virt_to_phys((virt_addr_t) ptr));
     struct alloc_page *page = &ptfl_allocator.alloc_pages_array[pfn];
 
     if (!(page->halloc_flags & HALLOC_FLAGS_MANAGED)) {
         /* Invalid pointer pointing to a page that is not managed by halloc */
-        return;
+        goto lock_release_out;
     }
 
     if (page->halloc_flags & HALLOC_FLAGS_PAGE_GRANULARITY) {
@@ -217,7 +229,7 @@ hfree(const void *ptr)
         const int nr_pages = page->contig_allocated;
         set_page_range_halloc_flags(page_range_start, nr_pages, HALLOC_FLAGS_CLEAR);
         free_pages(nr_pages, page_range_start);
-        return;
+        goto lock_release_out;
     }
 
     const int bin_index = get_alloc_page_bin_index(page);
@@ -226,6 +238,9 @@ hfree(const void *ptr)
     };
     memcpy((void *)ptr, &freelist_node, sizeof(free_chunk_hdr_t));
     ptfl_allocator.bins[bin_index] = (uintptr_t) ptr;
+
+lock_release_out:
+    spinlock_release(&global_halloc_lock);
 
     return;
 }
