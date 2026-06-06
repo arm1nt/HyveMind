@@ -116,16 +116,17 @@ cpuid(const uint32_t eax, const uint32_t ecx, cpuid_result_t *result)
     return -1;
 }
 
+
 static inline void
 enable_local_interrupts(void)
 {
-    // TODO:
+    asm volatile ("sti");
 }
 
 static inline void
 disable_local_interrupts(void)
 {
-    // TODO:
+    asm volatile ("cli");
 }
 
 #endif /* _HYVEMIND_X64_PROCESSOR_H */
