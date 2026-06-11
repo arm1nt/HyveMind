@@ -3,15 +3,8 @@
 
 #include "limine/limine.h"
 #include "mm_types.h"
-#include "asm/pgtable_types.h"
 
-struct mapping_info {
-    struct cr3 *addr_space;
-    uint64_t target_offset;
-    uint64_t curr_offset;
-    uint64_t ps_flags;
-    uint64_t nops_flags;
-};
+struct mapping_info;
 
 int
 directly_map_phys_range(

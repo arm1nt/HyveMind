@@ -4,7 +4,6 @@
 #include "string.h"
 #include "asm/paging.h"
 #include "asm/pgtables.h"
-#include "asm/direct_mapping.h"
 
 static inline void
 zero_pgtable_struct(const phys_addr_t paddr, const struct mapping_info *mapping_info)
@@ -89,7 +88,7 @@ pt_map_range(
 
         if (!pgtable_entry_present(entry)) {
             /* Since we currently don't use PAT, we can simply reuse the generic nops flags */
-            entry->raw_entry |= mapping_info->nops_flags | PGTABLE_PRESENT;
+            entry->raw_entry |= mapping_info->ps_flags | PGTABLE_PRESENT;
             write_paddr_to_pte(entry, __virt_to_phys(curr_vaddr_start, mapping_info->target_offset));
         }
 

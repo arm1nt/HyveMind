@@ -108,6 +108,8 @@ typedef union pgtable_entry pgtable_entry_t;
 
 #define PGTABLE_PRESENT         (U64(1))
 #define PGTABLE_RW              (U64(2))
+#define PGTABLE_PWT             (U64(1) << 3)
+#define PGTABLE_PCD             (U64(1) << 4)
 #define PGTABLE_XD              (U64(1) << 63)
 
 #endif /* _HYVEMIND_X64_ASM_PGTABLE_TYPES_H */

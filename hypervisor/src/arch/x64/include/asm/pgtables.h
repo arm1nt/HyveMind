@@ -3,10 +3,19 @@
 
 #include "mm_types.h"
 #include "pf_alloc.h"
+#include "asm/direct_mapping.h"
 #include "asm/paging.h"
 #include "asm/pgtable_types.h"
 
 #include <stdbool.h>
+
+struct mapping_info {
+    struct cr3 *addr_space;
+    uint64_t target_offset;
+    uint64_t curr_offset;
+    uint64_t ps_flags;
+    uint64_t nops_flags;
+};
 
 extern uint64_t max_phys_addr;
 
@@ -47,7 +56,8 @@ eligible_for_mb_mapping(const virt_addr_t start, const virt_addr_t end)
         return false;
     }
 
-    return true;
+    /* todo: change back to true as soon as we implement 2mb mappings */
+    return false;
 }
 
 static inline int
@@ -210,6 +220,9 @@ generic_init_nops_entry_raw(
 
 /* Walk the page tables to resolve the physical address of a given virtual addr */
 phys_addr_t resolve_virt_addr(const virt_addr_t vaddr);
+
+int identity_map_mmio_page(const phys_addr_t addr);
+int raw_identity_map_mmio_page(struct cr3 *addr_space, const phys_addr_t addr);
 
 #endif /* _HYVEMIND_X64_ASM_PGTABLES_H */
 
