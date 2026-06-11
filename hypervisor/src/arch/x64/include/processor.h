@@ -1,9 +1,8 @@
 #ifndef _HYVEMIND_X64_PROCESSOR_H
 #define _HYVEMIND_X64_PROCESSOR_H
 
-#include "cpufeatures.h"
 #include "types.h"
-#include <stdint.h>
+#include "per-cpu.h"
 
 #define ACCESS_CONTROL_REGISTER(reg)                        \
     static inline uint64_t read_##reg(void) {               \
@@ -71,6 +70,11 @@ write_rflags(uint64_t flags)
     );
 }
 
+DECLARE_PER_CPU(uint32_t, cpuid_range_base);
+DECLARE_PER_CPU(uint32_t, cpuid_max_leaf);
+DECLARE_PER_CPU(uint32_t, cpuid_extended_range_base);
+DECLARE_PER_CPU(uint32_t, cpuid_max_extended_leaf);
+
 /* Marker to indicate when the ecx value is irrelevant */
 #define NO_SUBLEAF_INDEX 0
 
@@ -106,16 +110,19 @@ cpuid_raw(const uint32_t eax, const uint32_t ecx)
 static inline int
 cpuid(const uint32_t eax, const uint32_t ecx, cpuid_result_t *result)
 {
-    if ((eax >= cpuid_range_base && eax <= cpuid_max_leaf)
-            || (eax >= cpuid_extended_range_base && eax <= cpuid_max_extended_leaf))
-    {
+    const bool in_base_range = (percpu_val(cpuid_range_base) <= eax &&
+                                percpu_val(cpuid_max_leaf) >= eax);
+
+    const bool in_ext_range = (percpu_val(cpuid_extended_range_base) <= eax &&
+                               percpu_val(cpuid_max_extended_leaf) >= eax);
+
+    if (in_base_range || in_ext_range) {
         __cpuid(eax, ecx, &result->eax, &result->ebx, &result->ecx, &result->edx);
         return 0;
     }
 
     return -1;
 }
-
 
 static inline void
 enable_local_interrupts(void)

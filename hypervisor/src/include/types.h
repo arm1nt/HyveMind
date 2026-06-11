@@ -4,6 +4,7 @@
 /* TODO: rename to 'bitops.h' or similar */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define U8(val)     ((uint8_t)  (val))
 #define U16(val)    ((uint16_t) (val))
