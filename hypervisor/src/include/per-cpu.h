@@ -1,6 +1,8 @@
 #ifndef _HYVEMIND_PER_CPU_H
 #define _HYVEMIND_PER_CPU_H
 
+#include "asm/current.h"
+
 #ifndef HYVEMIND_MAX_NR_CPUS
     #define HYVEMIND_MAX_NR_CPUS    64
 #endif
@@ -18,8 +20,6 @@
 
 #define DEFINE_PER_CPU_VAL(_type, _name, _val)              \
     DEFINE_PER_CPU(_type, _name) = {[0 ... HYVEMIND_MAX_NR_CPUS-1] = (_val) }
-
-extern int get_current_cpuid(void);
 
 #define percpu_ptr(_name) percpu_ptr_raw(_name, get_current_cpuid())
 #define percpu_ptr_raw(_name, _cpu) ((void *) &(__percpu_##_name[_cpu]))

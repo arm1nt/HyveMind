@@ -3,11 +3,6 @@
 
 #include "types.h"
 
-extern const uint32_t cpuid_range_base;
-extern uint32_t cpuid_max_leaf;
-extern const uint32_t cpuid_extended_range_base;
-extern uint32_t cpuid_max_extended_leaf;
-
 #define CPUID_BASE_RANGE_LIMITS_LEAF            0x00
 #define CPUID_EXTENDED_RANGE_LIMITS_LEAF        0x80000000
 #define CPUID_BRAND_STRING_LEAF                 0x00
@@ -42,6 +37,8 @@ extern uint32_t cpuid_max_extended_leaf;
 #define IA32_EFER_LME                       U64_LSHIFT(1, IA32_EFER_LME_BIT)
 #define IA32_EFER_LMA_BIT                   10 /* IA-32e mode active */
 #define IA32_EFER_LMA                       U64_LSHIFT(1, IA32_EFER_LMA_BIT)
+
+#define MSRX64_IA32_APIC_BASE               0x1B
 
 #define MSRX64_IA32_FEATURE_CONTROL_MSR     0x3A
 
