@@ -89,7 +89,7 @@ repopulate_bin(const int bin_index, const struct bin_config *config)
 }
 
 int
-init_ptfl_allocator(void)
+init_halloc(void)
 {
     memset(&ptfl_allocator, 0, sizeof(struct ptfl_allocator));
 
