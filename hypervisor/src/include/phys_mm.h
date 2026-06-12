@@ -13,6 +13,8 @@ extern int __hypervisor_rodata_start;
 extern int __hypervisor_rodata_end;
 extern int __hypervisor_data_start;
 extern int __hypervisor_data_end;
+extern int __hypervisor_bss_start;
+extern int __hypervisor_bss_end;
 
 enum memmap_region_type {
     MEMMAP_USABLE,

@@ -84,7 +84,7 @@ get_boot_mem_info(
     info->hypervisor_region.paddr_start = exec_info->physical_base;
     info->hypervisor_region.vaddr_start = __vaddr(&__hypervisor_base);
     info->hypervisor_region.length =
-        __vaddr(&__hypervisor_data_end) - __vaddr(&__hypervisor_base);
+        __vaddr(&__hypervisor_bss_end) - __vaddr(&__hypervisor_base);
 
     const virt_addr_t memmap_vaddr =
         __vaddr(boot_mem_info_scratch) + sizeof(boot_mem_info_t);

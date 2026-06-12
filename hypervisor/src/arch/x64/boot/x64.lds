@@ -77,6 +77,9 @@ SECTIONS
         *(COMMON)
     } :data
 
+    __hypervisor_bss_start = ADDR(.bss) ;
+    __hypervisor_bss_end = ADDR(.bss) + SIZEOF(.bss) ;
+
     /* Discard .note.* and .eh_frame* since they may cause issues on some hosts. */
     /DISCARD/ : {
         *(.eh_frame*)
