@@ -295,27 +295,21 @@ directly_map_phys_range(
 int
 raw_setup_direct_mapping_from_memmap(
         const struct mapping_info *mapping_info,
-        const struct limine_memmap_response *mem_map
+        const hyv_memmap_t *mem_map
 )
 {
     int ret = 0;
-    struct limine_memmap_entry *entry;
+    const memmap_entry_t *entry;
 
-    for (uint64_t i = 0; i < mem_map->entry_count; i++) {
-        entry = mem_map->entries[i];
+    for (uint64_t i = 0; i < mem_map->nr_entries; i++) {
+        entry = &mem_map->entry[i];
 
-        if (entry->type != LIMINE_MEMMAP_USABLE
-                && entry->type != LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE
-                && entry->type != LIMINE_MEMMAP_EXECUTABLE_AND_MODULES)
-        {
+        if (entry->type != MEMMAP_USABLE && entry->type != MEMMAP_HYPERVISOR
+                && entry->type != MEMMAP_BOOTLOADER_RECLAIMABLE) {
             continue;
         }
 
-        ret = directly_map_phys_range(
-                mapping_info,
-                entry->base,
-                entry->base + entry->length - 1
-        );
+        ret = directly_map_phys_range(mapping_info, entry->start, entry->end);
 
         if (ret != 0) {
             break;
@@ -343,7 +337,7 @@ phys_memory_fits(void)
 int
 setup_direct_mapping_from_memmap(
         const struct mapping_info *mapping_info,
-        const struct limine_memmap_response *mem_map
+        const hyv_memmap_t *mem_map
 )
 {
     if (!phys_memory_fits()) {

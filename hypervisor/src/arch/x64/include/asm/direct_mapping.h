@@ -1,8 +1,7 @@
 #ifndef _HYVEMIND_X64_ASM_DIRECT_MAPPING_H
 #define _HYVEMIND_X64_ASM_DIRECT_MAPPING_H
 
-#include "limine/limine.h"
-#include "mm_types.h"
+#include "phys_mm.h"
 
 struct mapping_info;
 
@@ -20,13 +19,13 @@ directly_map_phys_range(
 int
 raw_setup_direct_mapping_from_memmap(
         const struct mapping_info *mapping_info,
-        const struct limine_memmap_response *mem_map
+        const hyv_memmap_t *mem_map
 );
 
 int
 setup_direct_mapping_from_memmap(
         const struct mapping_info *mapping_info,
-        const struct limine_memmap_response *mem_map
+        const hyv_memmap_t *mem_map
 );
 
 #endif /* _HYVEMIND_X64_ASM_DIRECT_MAPPING_H */
