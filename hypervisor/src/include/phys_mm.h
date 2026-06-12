@@ -48,7 +48,6 @@ struct boot_mem_info {
         uint64_t length;
     } hypervisor_region;
 };
-
 typedef struct boot_mem_info boot_mem_info_t;
 
 struct system_memory_info {

@@ -1,13 +1,14 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#include "arch_init.h"
 #include "fatal.h"
 #include "halloc.h"
 #include "limine/requests.h"
 #include "pf_alloc.h"
 #include "phys_mm.h"
 #include "printf.h"
+#include "string.h"
+#include "asm/setup.h"
 #include "asm/paging.h"
 
 #ifdef HYVEMIND_GUEST_CONFIG_FROM_BOOTLOADER
@@ -16,11 +17,8 @@ static inline void
 confirm_bootloader_guest_info(void)
 {
     if (module_request.response == NULL || module_request.response->module_count < 1) {
-        printf("The bootloader did not provide module information!");
-        die();
+        die_reason("The bootloader did not provide module information!");
     }
-
-    printf("Received guest module information from the bootloader!");
 }
 
 #else
@@ -36,30 +34,29 @@ static void
 confirm_bootloader_info(void)
 {
     if (memmap_request.response == NULL || memmap_request.response->entry_count < 1) {
-        printf("The bootloader did not provide a memory map!");
-        die();
+        die_reason("Bootloader did not provide a memory map");
     }
-
-    printf("Received a memory map from the bootloader!");
 
     confirm_bootloader_guest_info();
 
     if (exec_addr_request.response == NULL) {
-        printf("The bootloader did not provide information about the executables' address");
-        die();
+        die_reason("Bootloader did not provide information about the executables' address");
     }
-
-    printf("Received information about the executables' address from the bootloader!");
 
     if (hhdm_request.response == NULL) {
-        printf("The bootloader did not provide HHDM information!");
-        die();
+        die_reason("The bootloader did not provide HHDM information!");
     }
 
-    printf("Received HHDM information from the bootloader!");
+    if (rsdp_request.response == NULL || rsdp_request.response->address == NULL) {
+        die_reason("The bootloader did not provide the address of the RSDP table");
+    }
+
+    if (mp_request.response == NULL || mp_request.response->cpu_count < 1) {
+        die_reason("Bootloader failed to bring up APs");
+    }
 }
 
-void
+void __no_return
 hypervisor_main(void)
 {
     /* Ensure the bootloader actually understands our base revision */
@@ -70,29 +67,40 @@ hypervisor_main(void)
     if (init_printf() != 0) {
         die();
     }
-    printf("Successfully initialized printf!");
+
+    pr_debug("Successfully initialized printf!");
 
     confirm_bootloader_info();
+    pr_debug("Received all information requested from the bootloader");
 
     early_direct_mapping_offset = hhdm_request.response->offset;
-    printf("Set 'early_direct_mapping_offset' to value: '0x%lx'", early_direct_mapping_offset);
 
-    init_system_memory_info(memmap_request.response);
+    const boot_mem_info_t boot_mem_info = get_boot_mem_info(
+            memmap_request.response
+    );
+    init_system_memory_info(&boot_mem_info);
+    pr_debug("Organized information about early boot memory layout");
 
-    if (early_init_page_frame_allocator(memmap_request.response,  early_direct_mapping_offset) != 0) {
-        printf("Failed to initialize the page frame allocator");
-        die();
+    const uint64_t curr_dm_offset = hhdm_request.response->offset;
+    if (early_init_page_frame_allocator(memmap_request.response, curr_dm_offset) != 0) {
+        die_reason("Failed to initialize the page frame allocator");
     }
-    printf("(Early-)Initialized the pageframe allocator");
+    pr_debug("(Early-) initialized the page frame allocator");
 
-    arch_init(memmap_request.response, exec_addr_request.response);
-
-    if (init_ptfl_allocator() != 0) {
-        printf("Failed to initialize the hypervisor's memory allocator");
-        die();
+    virt_addr_t top_of_stack = arch_replace_stack(8);
+    if (top_of_stack == 0) {
+        die_reason("Failed to switch BSP stack");
     }
-    printf("Successfully inintialized the memory allocator!");
+    pr_debug("Switched BSP stack to %lx", top_of_stack);
 
-    die();
+    arch_setup_bsp();
+    pr_debug("Done with arch setup of the bootstrap processor");
+
+    if (init_halloc() != 0) {
+        die_reason("Failed to initialize the hypervisor's internal heap memory allocator");
+    }
+    pr_debug("Successfully inintialized the memory allocator!");
+
+    die_reason("Reached end of main");
 }
 
