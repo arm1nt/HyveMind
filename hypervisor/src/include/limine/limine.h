@@ -406,6 +406,8 @@ struct limine_memmap_response {
     LIMINE_PTR(struct limine_memmap_entry **) entries;
 };
 
+typedef struct limine_memmap_response limine_memmap_t;
+
 struct limine_memmap_request {
     uint64_t id[4];
     uint64_t revision;
@@ -561,6 +563,7 @@ struct limine_executable_address_response {
     uint64_t physical_base;
     uint64_t virtual_base;
 };
+typedef struct limine_executable_address_response limine_exec_addr_info_t;
 
 struct limine_executable_address_request {
     uint64_t id[4];
