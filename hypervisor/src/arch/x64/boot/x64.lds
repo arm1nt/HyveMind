@@ -23,6 +23,8 @@ SECTIONS
     /* that is the beginning of the region. */
     . = 0xffffffff80000000;
 
+    __hypervisor_base = . ;
+
     /* Define a section to contain the Limine requests and assign it to its own PHDR */
     .limine_requests : {
         KEEP(*(.limine_requests_start))
@@ -36,6 +38,9 @@ SECTIONS
     .text : {
         *(.text .text.*)
     } :text
+
+    __hypervisor_text_start = ADDR(.text) ;
+    __hypervisor_text_end = ADDR(.text) + SIZEOF(.text) ;
 
     /* Move to the next memory page for .rodata */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
@@ -53,9 +58,15 @@ SECTIONS
     /* Move to the next memory page for .data */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
+    __hypervisor_rodata_start = ADDR(.rodata) ;
+    __hypervisor_rodata_end = ADDR(.rodata) + SIZEOF(.rodata) ;
+
     .data : {
         *(.data .data.*)
     } :data
+
+    __hypervisor_data_start = ADDR(.data) ;
+    __hypervisor_data_end = ADDR(.data) + SIZEOF(.data) ;
 
     /* NOTE: .bss needs to be the last thing mapped to :data, otherwise lots of */
     /* unnecessary zeros will be written to the binary. */
