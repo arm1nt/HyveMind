@@ -1,18 +1,21 @@
 #include "printf.h"
+#include "cpufeatures.h"
 #include "processor.h"
-#include "string.h"
+#include "per-cpu.h"
 #include "asm/mm.h"
-#include "asm/direct_mapping.h"
-#include "asm/paging.h"
-#include "asm/pgtable_types.h"
 
 bool supports_1gb_pages = false;
-uint64_t max_phys_addr;
+
+DEFINE_PER_CPU_VAL(uint64_t, max_phys_addr,  0xFFFFFFFFFFFFF);
+/* Keep until all usages in the page table logic is removed */
+uint64_t max_phys_addr = 0xFFFFFFFFFFFFF;
 uint64_t early_direct_mapping_offset;
 
 static inline int
 get_max_phys_addr(void)
 {
+    uint64_t *max_phys_addr = percpu_ptr(max_phys_addr);
+
     cpuid_result_t result;
     if (cpuid(CPUID_MAX_PHYS_ADDR_LEAF, NO_SUBLEAF_INDEX, &result) != 0) {
         return -1;
@@ -20,7 +23,7 @@ get_max_phys_addr(void)
 
     /* Max phys addr size is stored in bits 0..7 of result.eax */
     const uint32_t bits = result.eax & ((U32(1) << 8) - 1);
-    max_phys_addr = (U64(1) << bits) - 1;
+    *max_phys_addr = (U64(1) << bits) - 1;
 
     return 0;
 }
@@ -40,73 +43,15 @@ check_supported_page_sizes(void)
     }
 }
 
-static int
-_early_setup_direct_mapping(
-        const struct limine_memmap_response *mem_map,
-        const struct limine_executable_address_response *exec_addr_info
-)
-{
-    struct cr3 new_addr_space;
-    memset(&new_addr_space, 0, sizeof(struct cr3));
-
-    const struct mapping_info mapping_info = {
-        .addr_space = &new_addr_space,
-        .curr_offset = EARLY_DIRECT_MAPPING_OFFSET,
-        .target_offset = HYPERVISOR_DIRECT_MAPPING_OFFSET,
-        .ps_flags = PGTABLE_RW,
-        .nops_flags = PGTABLE_RW
-    };
-
-    if (setup_direct_mapping_from_memmap(&mapping_info, mem_map) != 0) {
-        return -1;
-    }
-
-    /**
-     * The bootloader maps the executable at 0xffffffff80000000 as well
-     * so its included in the direct mapping and there is an extra mapping too
-     * -> We have to map both
-     */
-
-    /* todo: do properly */
-    const struct mapping_info scnd = {
-        .addr_space = &new_addr_space,
-        .curr_offset = EARLY_DIRECT_MAPPING_OFFSET,
-        .target_offset = exec_addr_info->virtual_base - exec_addr_info->physical_base,
-        .ps_flags = PGTABLE_RW,
-        .nops_flags = PGTABLE_RW
-    };
-
-    directly_map_phys_range(
-            &scnd,
-            exec_addr_info->physical_base,
-            exec_addr_info->physical_base + (0xa000-1));
-
-    const uint64_t *cr3_flattened = (uint64_t *) &new_addr_space;
-    write_cr3(*cr3_flattened);
-
-    /* need to change the return instruction pointer when the offset of the
-     * direct mapping is different from the one we create */
-
-    return 0;
-}
-
 int
-init_mm(const struct limine_memmap_response *mem_map, const struct limine_executable_address_response *exec_addr_info)
+early_mm_init(void)
 {
-    printf("Starting X64 specific memory management initialization...");
-
     if (get_max_phys_addr() != 0) {
-        printf("Unable to query the max physical addr size supported");
+        printf("Unable to determine the processors max supported physical addr width");
         return -1;
     }
 
     check_supported_page_sizes();
-
-    if (_early_setup_direct_mapping(mem_map, exec_addr_info) != 0) {
-        printf("Failed to install direct mapping");
-        return -1;
-    }
-
     return 0;
 }
 

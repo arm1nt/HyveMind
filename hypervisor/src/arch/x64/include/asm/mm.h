@@ -1,17 +1,12 @@
 #ifndef _HYVEMIND_X64_ASM_MM_H
 #define _HYVEMIND_X64_ASM_MM_H
 
-#include "limine/limine.h"
 #include <stdint.h>
 
 extern uint64_t max_phys_addr;
 #define MAX_PHYS_ADDR max_phys_addr;
 
-int
-init_mm(
-        const struct limine_memmap_response *mem_map,
-        const struct limine_executable_address_response *exec_addr_info
-);
+int early_mm_init(void);
 
 #endif /* _HYVEMIND_X64_ASM_MM_H */
 
