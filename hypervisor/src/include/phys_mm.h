@@ -70,7 +70,11 @@ const sys_mem_info_t* init_system_memory_info(const boot_mem_info_t *info);
 
 const sys_mem_info_t* get_system_memory_info(void);
 
-boot_mem_info_t get_boot_mem_info(const limine_memmap_t *limine_mem_map);
+boot_mem_info_t
+get_boot_mem_info(
+        const limine_memmap_t *limine_mem_map,
+        const limine_exec_addr_info_t *exec_addr_info
+);
 
 #endif /* _HYVEMIND_PHYS_MM_H */
 

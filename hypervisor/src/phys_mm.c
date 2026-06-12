@@ -74,12 +74,14 @@ limine_memmap_type_to_hyv_type(const int limine_type)
 }
 
 boot_mem_info_t
-get_boot_mem_info(const limine_memmap_t *limine_mem_map)
+get_boot_mem_info(
+        const limine_memmap_t *limine_mem_map,
+        const limine_exec_addr_info_t *exec_info
+)
 {
     boot_mem_info_t *info = (boot_mem_info_t *) boot_mem_info_scratch;
 
-    info->hypervisor_region.paddr_start =
-        __vaddr(&__hypervisor_base) - early_direct_mapping_offset;
+    info->hypervisor_region.paddr_start = exec_info->physical_base;
     info->hypervisor_region.vaddr_start = __vaddr(&__hypervisor_base);
     info->hypervisor_region.length =
         __vaddr(&__hypervisor_data_end) - __vaddr(&__hypervisor_base);

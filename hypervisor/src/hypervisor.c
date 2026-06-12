@@ -76,7 +76,8 @@ hypervisor_main(void)
     early_direct_mapping_offset = hhdm_request.response->offset;
 
     const boot_mem_info_t boot_mem_info = get_boot_mem_info(
-            memmap_request.response
+            memmap_request.response,
+            exec_addr_request.response
     );
     init_system_memory_info(&boot_mem_info);
     pr_debug("Organized information about early boot memory layout");
