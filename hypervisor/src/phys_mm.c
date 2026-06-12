@@ -66,6 +66,8 @@ limine_memmap_type_to_hyv_type(const int limine_type)
             return MEMMAP_USABLE;
         case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
             return MEMMAP_BOOTLOADER_RECLAIMABLE;
+        case LIMINE_MEMMAP_EXECUTABLE_AND_MODULES:
+            return MEMMAP_HYPERVISOR;
         default:
             return MEMMAP_RESERVED;
     }

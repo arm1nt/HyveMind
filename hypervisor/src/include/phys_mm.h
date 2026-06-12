@@ -17,6 +17,7 @@ extern int __hypervisor_data_end;
 enum memmap_region_type {
     MEMMAP_USABLE,
     MEMMAP_BOOTLOADER_RECLAIMABLE,
+    MEMMAP_HYPERVISOR,
     MEMMAP_RESERVED
 };
 typedef enum memmap_region_type memmap_region_type_t;
