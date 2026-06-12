@@ -1,9 +1,10 @@
 #include "fatal.h"
-#include "asm/mm.h"
 #include "mm_types.h"
 #include "per-cpu.h"
 #include "string.h"
 #include "asm/apic.h"
+#include "asm/gdt_idt.h"
+#include "asm/mm.h"
 #include "asm/pgtables.h"
 #include "asm/setup.h"
 
@@ -177,6 +178,21 @@ __arch_setup_bsp(void)
     if (create_addr_space() == false) {
         die_reason("Failed to the address space of the BSP");
     }
+
+    if (init_new_gdt() != 0) {
+        die_reason("Failed to create a GDT for the BSP");
+    }
+
+    if (install_new_tss() != 0) {
+        die_reason("Failed to install a TSS into the GDT of the BSP");
+    }
+
+    if (load_gdt() != 0) {
+        die_reason("Failed to load the GDT for the BSP");
+    }
+
+    init_shared_idt();
+    load_shared_idt();
 }
 
 static void

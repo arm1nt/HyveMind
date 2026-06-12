@@ -1,11 +1,13 @@
 #include "types.h"
-#include "gdt_idt.h"
 #include "idt.h"
 #include "mm_types.h"
 #include "string.h"
 #include "printf.h"
+#include "per-cpu.h"
+#include "asm/gdt_idt.h"
 
-static struct gdt_struct gdt;
+DEFINE_PER_CPU_ALIGNED(struct gdt_struct, gdt_tables, PAGE_SIZE);
+/* We share the idt across all logical processors */
 static struct idt_struct idt;
 
 void
@@ -72,7 +74,7 @@ register_idt_handler(
     register_idt_handler(idt, index, IA32E_TRAP_GATE, (virt_addr_t)handler, ist_index)
 
 static inline void
-load_idt(const struct idt_struct *idt)
+_load_idt(const struct idt_struct *idt)
 {
     const idt_ptr_t install_ptr = {
         .limit = IDT_LIMIT(IDT_ENTRIES),
@@ -82,15 +84,19 @@ load_idt(const struct idt_struct *idt)
     asm volatile ("LIDT %0" :: "m"(install_ptr));
 }
 
-static void
-setup_idt(void)
+void
+init_shared_idt(void)
 {
     memset(&idt, 0, sizeof(struct idt_struct));
 
-    REGISTER_TRAP_GATE(&idt, DIVIDE_ERROR_VECTOR, asm_div_exception_handler, 0);
-    REGISTER_TRAP_GATE(&idt, DOUBLE_FAULT_VECTOR, asm_double_fault_handler, 1);
+    REGISTER_TRAP_GATE(&idt, DIVIDE_ERROR_VECTOR, asm_div_exception_handler, TSS_IST_INDEX0);
+    REGISTER_TRAP_GATE(&idt, DOUBLE_FAULT_VECTOR, asm_double_fault_handler, TSS_IST_INDEX1);
+}
 
-    load_idt(&idt);
+void
+load_shared_idt(void)
+{
+    _load_idt(&idt);
 }
 
 static inline void
@@ -113,7 +119,7 @@ write_gdt_entry(
 }
 
 static inline void
-load_gdt(const struct gdt_struct *gdt)
+_load_gdt(const struct gdt_struct *gdt)
 {
     const gdt_ptr_t install_ptr = {
         .limit = GDT_LIMIT(GDT_ENTRIES),
@@ -123,22 +129,38 @@ load_gdt(const struct gdt_struct *gdt)
     asm volatile ("LGDT %0" :: "m"(install_ptr));
 }
 
-static int
-setup_gdt(void)
+int
+init_new_gdt(void)
 {
-    memset(&gdt, 0, sizeof(struct gdt_struct));
-    write_gdt_entry(&gdt, &hyvemind_cs_segment_desc, HYVEMIND_CS_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
-    write_gdt_entry(&gdt, &hyvemind_data_segment_desc, HYVEMIND_DATA_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
+    struct gdt_struct *gdt_table = percpu_ptr(gdt_tables);
+
+    memset(gdt_table, 0, sizeof(*gdt_table));
+    write_gdt_entry(gdt_table, &hyvemind_cs_segment_desc, HYVEMIND_CS_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
+    write_gdt_entry(gdt_table, &hyvemind_data_segment_desc, HYVEMIND_DATA_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
+
+    return 0;
+}
+
+int
+install_new_tss(void)
+{
+    struct gdt_struct *gdt = percpu_ptr(gdt_tables);
 
     tss_t tss_segment;
     if (init_default_tss(&tss_segment, TSS_IST_DEFAULT_SIZE_PAGES) != 0)  {
+        pr_error("Failed to create a new TSS segment");
         return -1;
     }
-    init_default_tss(&tss_segment, TSS_IST_DEFAULT_SIZE_PAGES);
     tss_descriptor_t tss_desc = create_tss_desc(&tss_segment, 0);
-    write_gdt_entry(&gdt, &tss_desc, HYVEMIND_TSS_INDEX, SYSTEM_SEGMENT_DESC);
 
-    load_gdt(&gdt);
+    write_gdt_entry(gdt, &tss_desc, HYVEMIND_TSS_INDEX, SYSTEM_SEGMENT_DESC);
+    return 0;
+}
+
+int
+load_gdt(void)
+{
+    _load_gdt(percpu_ptr(gdt_tables));
 
     const struct segment_regs regs = {
         .cs = GDT_SELECTOR(HYVEMIND_CS_SEGMENT_INDEX, TI_GDT, 0),
@@ -152,21 +174,6 @@ setup_gdt(void)
 
     segment_selector_t tss_selector = GDT_SELECTOR(HYVEMIND_TSS_INDEX, TI_GDT, 0);
     reload_tr_register(&tss_selector);
-
-    return 0;
-}
-
-int
-setup_gdt_idt(void)
-{
-    int ret = 0;
-
-    ret = setup_gdt();
-    if (ret) {
-        return ret;
-    }
-
-    setup_idt();
 
     return 0;
 }

@@ -30,6 +30,15 @@ typedef struct tss_descriptor tss_descriptor_t;
     uint32_t name##_high
 
 #define TSS_IST_DEFAULT_SIZE_PAGES  4
+enum {
+    TSS_IST_INDEX0,
+    TSS_IST_INDEX1,
+    TSS_IST_INDEX2,
+    TSS_IST_INDEX3,
+    TSS_IST_INDEX4,
+    TSS_IST_INDEX5,
+    TSS_IST_INDEX6,
+};
 
 struct tss {
     uint32_t reserved0;
