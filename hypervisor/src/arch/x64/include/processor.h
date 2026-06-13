@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_X64_PROCESSOR_H
 #define _HYVEMIND_X64_PROCESSOR_H
 
+#include "cpufeatures.h"
 #include "types.h"
 #include "per-cpu.h"
 
@@ -122,6 +123,24 @@ cpuid(const uint32_t eax, const uint32_t ecx, cpuid_result_t *result)
     }
 
     return -1;
+}
+
+static inline bool
+cpuid_leaf_in_range(const uint32_t leaf)
+{
+    cpuid_result_t res;
+
+    res = cpuid_raw(CPUID_BASE_RANGE_LIMITS_LEAF, NO_SUBLEAF_INDEX);
+    if (CPUID_RANGE_BASE_VAL <= leaf && leaf <= res.eax) {
+        return true;
+    }
+
+    res = cpuid_raw(CPUID_EXTENDED_RANGE_LIMITS_LEAF, NO_SUBLEAF_INDEX);
+    if (CPUID_EXT_RANGE_BASE_VAL <= leaf && leaf <= res.eax) {
+        return true;
+    }
+
+    return false;
 }
 
 static inline void

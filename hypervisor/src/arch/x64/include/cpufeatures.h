@@ -3,12 +3,16 @@
 
 #include "types.h"
 
+#define CPUID_RANGE_BASE_VAL                    0x00
+#define CPUID_EXT_RANGE_BASE_VAL                0x80000000
+
 #define CPUID_BASE_RANGE_LIMITS_LEAF            0x00
 #define CPUID_EXTENDED_RANGE_LIMITS_LEAF        0x80000000
 #define CPUID_BRAND_STRING_LEAF                 0x00
 #define CPUID_CPU_FEATURES_LEAF                 0x01
 #define CPUID_PAGE_1GB_LEAF                     0x80000001
 #define CPUID_MAX_PHYS_ADDR_LEAF                0x80000008
+#define CPUID_MAX_APIC_ADDR_LEAF                0x80000008
 
 #define CPUID_VMX_BIT                           5 /* cpuid_result.ecx */
 #define CPUID_VMX                               (U32(1) << CPUID_VMX_BIT)
@@ -16,6 +20,8 @@
 #define CPUID_MSR                               (U32(1) << CPUID_MSR_BIT)
 #define CPUID_LAPIC_BIT                         9 /* cpuid_result.edx */
 #define CPUID_LAPIC                             (U32(1) << CPUID_LAPIC_BIT)
+#define CPUID_X2APIC_MODE_BIT                   21 /* cpuid_result.ecx */
+#define CPUID_X2APIC_MODE                       (U32(1) << CPUID_X2APIC_MODE_BIT)
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
 
@@ -41,6 +47,10 @@
 #define IA32_EFER_LMA                       U64_LSHIFT(1, IA32_EFER_LMA_BIT)
 
 #define MSRX64_IA32_APIC_BASE               0x1B
+#define MSR_APIC_BASE_EXTD_BIT              10
+#define MSR_APIC_BASE_EXTD                  (U64_LSHIFT(1, MSR_APIC_BASE_EXTD_BIT))
+
+#define MSR_X2APIC_LAPIC_ID_REGISTER        0x802
 
 #define MSRX64_IA32_FEATURE_CONTROL_MSR     0x3A
 
