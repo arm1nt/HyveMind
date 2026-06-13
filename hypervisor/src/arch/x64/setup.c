@@ -85,6 +85,11 @@ all_cpu_features_supported(void)
         return false;
     }
 
+    if (IS_CLEAR(result.edx, CPUID_LAPIC)) {
+        pr_error("No local APIC present!");
+        return false;
+    }
+
     return true;
 }
 

@@ -14,6 +14,8 @@
 #define CPUID_VMX                               (U32(1) << CPUID_VMX_BIT)
 #define CPUID_MSR_BIT                           5 /* cpuid_result.edx */
 #define CPUID_MSR                               (U32(1) << CPUID_MSR_BIT)
+#define CPUID_LAPIC_BIT                         9 /* cpuid_result.edx */
+#define CPUID_LAPIC                             (U32(1) << CPUID_LAPIC_BIT)
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
 
