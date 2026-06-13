@@ -88,8 +88,8 @@ hypervisor_main(void)
     }
     pr_debug("(Early-) initialized the page frame allocator");
 
-    virt_addr_t top_of_stack = arch_replace_stack(8);
-    if (top_of_stack == 0) {
+    virt_addr_t top_of_stack = arch_replace_stack(DEFAULT_HYV_THREAD_STACK_SIZE);
+    if (!top_of_stack) {
         die_reason("Failed to switch BSP stack");
     }
     pr_debug("Switched BSP stack to %lx", top_of_stack);
@@ -101,6 +101,9 @@ hypervisor_main(void)
         die_reason("Failed to initialize the hypervisor's internal heap memory allocator");
     }
     pr_debug("Successfully inintialized the memory allocator!");
+
+    arch_bringup_aps();
+    pr_debug("Initialized APs");
 
     die_reason("Reached end of main");
 }
