@@ -24,7 +24,6 @@ extern virt_addr_t arch_rebase_current_stack(
         const unsigned int frames_to_unwind
 );
 
-void arch_bringup_aps(void);
 void arch_bringup_aps_limine(const struct limine_mp_response *mp_info);
 
 #endif /* _HYVEMIND_X64_ASM_SETUP_H */

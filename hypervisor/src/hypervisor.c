@@ -102,7 +102,7 @@ hypervisor_main(void)
     }
     pr_debug("Successfully inintialized the memory allocator!");
 
-    arch_bringup_aps();
+    arch_bringup_aps_limine(mp_request.response);
     pr_debug("Initialized APs");
 
     die_reason("Reached end of main");

@@ -7,10 +7,11 @@
 #include "asm/mm.h"
 #include "asm/pgtables.h"
 #include "asm/setup.h"
+#include "asm/vmm.h"
 
-DEFINE_PER_CPU_VAL(uint32_t, cpuid_range_base, 0x00);
+DEFINE_PER_CPU_VAL(uint32_t, cpuid_range_base, CPUID_RANGE_BASE_VAL);
 DEFINE_PER_CPU(uint32_t, cpuid_max_leaf);
-DEFINE_PER_CPU_VAL(uint32_t, cpuid_extended_range_base, 0x80000000);
+DEFINE_PER_CPU_VAL(uint32_t, cpuid_extended_range_base, CPUID_EXT_RANGE_BASE_VAL);
 DEFINE_PER_CPU(uint32_t, cpuid_max_extended_leaf);
 
 static bool
@@ -158,6 +159,9 @@ create_addr_space(void)
         return false;
     }
 
+    logical_processor_t *processor = percpu_ptr(logical_processor);
+    processor->raw_cr3 = *((const uint64_t *) &new_addr_space);
+
     write_cr3(*(const uint64_t *) &new_addr_space);
 
     return true;
@@ -200,16 +204,62 @@ __arch_setup_bsp(void)
     load_shared_idt();
 }
 
-static void
+extern uint8_t boot_info_scratch[];
+
+struct shared_boot_info {
+    uint64_t raw_shared_cr3;
+};
+
+static void __no_return
 arch_setup_ap(void)
 {
-    return;
+    arch_rebase_current_stack(DEFAULT_HYV_THREAD_STACK_SIZE, 1);
+
+    const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
+    write_cr3(info->raw_shared_cr3);
+
+    init_new_gdt();
+    install_new_tss();
+    load_gdt();
+
+    load_shared_idt();
+
+    die_reason("and dead.");
 }
 
-
-void
-arch_bringup_aps(void)
+static void __no_return
+arch_setup_ap_limine(const struct limine_mp_info *info)
 {
-    return;
+    arch_setup_ap();
+}
+
+/**
+ * Wrapper using limine provided AP information until we implement
+ * AP initialization manually
+ */
+void
+arch_bringup_aps_limine(const struct limine_mp_response *mp_info)
+{
+
+    const lapicid_t curr_lapic_id = read_lapic_id();
+    const logical_processor_t *bsp = percpu_ptr(logical_processor);
+
+    struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
+    info->raw_shared_cr3 = bsp->raw_cr3;
+
+    struct limine_mp_info  *entry;
+    for (uint64_t i = 0; i < mp_info->cpu_count; i++) {
+        entry = mp_info->cpus[i];
+
+        if (curr_lapic_id == entry->lapic_id) {
+            continue;
+        }
+
+        asm volatile (
+                "movq %0, (%1)"
+                :
+                : "r"(&arch_setup_ap_limine), "r"(&entry->goto_address)
+        );
+    }
 }
 
