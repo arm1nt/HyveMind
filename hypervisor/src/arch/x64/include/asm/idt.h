@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_X64_IDT_H
-#define _HYVEMIND_X64_IDT_H
+#ifndef _HYVEMIND_X64_ASM_IDT_H
+#define _HYVEMIND_X64_ASM_IDT_H
 
 #ifndef __ASSEMBLER__
 
@@ -30,5 +30,5 @@
 DECLARE_IDT_ASM_TRAMPOLINE(asm_div_exception_handler, c_div_exception_handler)
 DECLARE_IDT_ASM_TRAMPOLINE(asm_double_fault_handler, c_double_fault_handler)
 
-#endif /* _HYVEMIND_X64_IDT_H */
+#endif /* _HYVEMIND_X64_ASM_IDT_H */
 

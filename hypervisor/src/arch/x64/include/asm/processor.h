@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_X64_PROCESSOR_H
-#define _HYVEMIND_X64_PROCESSOR_H
+#ifndef _HYVEMIND_X64_ASM_PROCESSOR_H
+#define _HYVEMIND_X64_ASM_PROCESSOR_H
 
 #include "cpufeatures.h"
 #include "types.h"
@@ -155,5 +155,5 @@ disable_local_interrupts(void)
     asm volatile ("cli");
 }
 
-#endif /* _HYVEMIND_X64_PROCESSOR_H */
+#endif /* _HYVEMIND_X64_ASM_PROCESSOR_H */
 

@@ -1,4 +1,4 @@
-#include "processor.h"
+#include "asm/processor.h"
 #include "asm/pgtables.h"
 
 static inline int

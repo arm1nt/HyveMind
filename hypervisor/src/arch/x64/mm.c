@@ -1,7 +1,7 @@
 #include "printf.h"
-#include "cpufeatures.h"
-#include "processor.h"
 #include "per-cpu.h"
+#include "asm/cpufeatures.h"
+#include "asm/processor.h"
 #include "asm/mm.h"
 
 bool supports_1gb_pages = false;
@@ -47,7 +47,7 @@ int
 early_mm_init(void)
 {
     if (get_max_phys_addr() != 0) {
-        printf("Unable to determine the processors max supported physical addr width");
+        pr_error("Unable to determine the processor's max supported physical addr width");
         return -1;
     }
 

@@ -1,10 +1,10 @@
 #include "types.h"
-#include "idt.h"
 #include "mm_types.h"
 #include "string.h"
 #include "printf.h"
 #include "per-cpu.h"
 #include "asm/gdt_idt.h"
+#include "asm/idt.h"
 
 DEFINE_PER_CPU_ALIGNED(struct gdt_struct, gdt_tables, PAGE_SIZE);
 /* We share the idt across all logical processors */
