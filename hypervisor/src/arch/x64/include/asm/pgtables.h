@@ -84,6 +84,24 @@ pt_entry_index(const virt_addr_t addr)
     return (addr << 43) >> 55;
 }
 
+static inline pgtable_entry_t *
+__get_pgtable_entry(
+        const struct mapping_info *mapping_info,
+        const phys_addr_t pgtable_addr,
+        const int entry_index
+)
+{
+    const phys_addr_t entry_paddr = pgtable_addr + (entry_index << 3);
+    return (pgtable_entry_t *) __phys_to_virt(entry_paddr, mapping_info->curr_offset);
+}
+
+static inline pgtable_entry_t *
+get_pgtable_entry(const phys_addr_t pgtable_addr, const int entry_index)
+{
+    const phys_addr_t entry_paddr = pgtable_addr + (entry_index << 3);
+    return (pgtable_entry_t *) phys_to_virt(entry_paddr);
+}
+
 static inline virt_addr_t
 get_x_entry_block_end(
         const virt_addr_t start,
@@ -223,6 +241,8 @@ phys_addr_t resolve_virt_addr(const virt_addr_t vaddr);
 
 int identity_map_mmio_page(const phys_addr_t addr);
 int raw_identity_map_mmio_page(struct cr3 *addr_space, const phys_addr_t addr);
+
+int add_page_attributes(const virt_addr_t page_start, const uint64_t attrs);
 
 #endif /* _HYVEMIND_X64_ASM_PGTABLES_H */
 

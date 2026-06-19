@@ -55,17 +55,6 @@ _init_pdt_nops_entry(pgtable_entry_t *entry, const struct mapping_info *mapping_
     return 0;
 }
 
-static inline pgtable_entry_t *
-get_pgtable_entry(
-        const struct mapping_info *mapping_info,
-        const phys_addr_t pgtable_addr,
-        const int entry_index
-)
-{
-    const phys_addr_t entry_paddr = pgtable_addr + (entry_index << 3);
-    return (pgtable_entry_t *) __phys_to_virt(entry_paddr, mapping_info->curr_offset);
-}
-
 static int
 pt_map_range(
         const struct mapping_info *mapping_info,
@@ -84,7 +73,7 @@ pt_map_range(
         curr_vaddr_end = get_pt_entry_block_end(curr_vaddr_start, vaddr_end);
 
         const int entry_index = pt_entry_index(curr_vaddr_start);
-        pgtable_entry_t *entry = get_pgtable_entry(mapping_info, pt_ptr, entry_index);
+        pgtable_entry_t *entry = __get_pgtable_entry(mapping_info, pt_ptr, entry_index);
 
         if (!pgtable_entry_present(entry)) {
             /* Since we currently don't use PAT, we can simply reuse the generic nops flags */
@@ -116,7 +105,7 @@ pdt_map_range(
         curr_vaddr_end = get_pdt_entry_block_end(curr_vaddr_start, vaddr_end);
 
         const int entry_index = pdt_entry_index(curr_vaddr_start);
-        pgtable_entry_t *entry = get_pgtable_entry(mapping_info, pdt_ptr, entry_index);
+        pgtable_entry_t *entry = __get_pgtable_entry(mapping_info, pdt_ptr, entry_index);
 
         if (pgtable_entry_present(entry) && pgtable_entry_maps_page(entry)) {
             goto skip_pdt_mapping;
@@ -177,7 +166,7 @@ pdpt_map_range(
         curr_vaddr_end = get_pdpt_entry_block_end(curr_vaddr_start, vaddr_end);
 
         const int entry_index = pdpt_entry_index(curr_vaddr_start);
-        pgtable_entry_t *entry = get_pgtable_entry(mapping_info, pdpt_ptr, entry_index);
+        pgtable_entry_t *entry = __get_pgtable_entry(mapping_info, pdpt_ptr, entry_index);
 
         if (!supports_1gb_pages) {
             goto do_mapping_via_pdt;
@@ -246,7 +235,7 @@ pml4_map_range(
         curr_vaddr_end = get_pml4_entry_block_end(curr_vaddr_start, vaddr_end);
 
         const int entry_index = pml4_entry_index(curr_vaddr_start);
-        pgtable_entry_t *entry = get_pgtable_entry(mapping_info, pml4_ptr, entry_index);
+        pgtable_entry_t *entry = __get_pgtable_entry(mapping_info, pml4_ptr, entry_index);
         if (!pgtable_entry_present(entry)) {
             ret = _init_pml4_entry(entry, mapping_info);
             if (ret != 0) {
