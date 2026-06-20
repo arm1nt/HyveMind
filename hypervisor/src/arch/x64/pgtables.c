@@ -34,7 +34,11 @@ raw_identity_map_mmio_page(struct cr3 *addr_space, const phys_addr_t addr)
 }
 
 int
-add_page_attributes(const virt_addr_t page_start, const uint64_t attrs)
+modify_page_attributes(
+        const virt_addr_t page_start,
+        const uint64_t attrs,
+        page_attr_mod_t mod_op
+)
 {
     uint64_t raw_cr3;
     struct cr3 *addr_space;
@@ -62,7 +66,7 @@ add_page_attributes(const virt_addr_t page_start, const uint64_t attrs)
     if (!pgtable_entry_present(entry)) {
         goto unmapped_page_error_out;
     } else if (pgtable_entry_maps_page(entry)) {
-        entry->raw_entry |= attrs;
+        mod_op(&entry->raw_entry, attrs);
         return 0;
     }
 
@@ -72,7 +76,7 @@ add_page_attributes(const virt_addr_t page_start, const uint64_t attrs)
     if (!pgtable_entry_present(entry)) {
         goto unmapped_page_error_out;
     } else if (pgtable_entry_maps_page(entry)) {
-        entry->raw_entry |= attrs;
+        mod_op(&entry->raw_entry, attrs);
         return 0;
     }
 
@@ -83,11 +87,11 @@ add_page_attributes(const virt_addr_t page_start, const uint64_t attrs)
         goto unmapped_page_error_out;
     }
 
-    entry->raw_entry |= attrs;
+    mod_op(&entry->raw_entry, attrs);
     return 0;
 
 unmapped_page_error_out:
-    pr_warn("Cannot add attributes to an unmapped page");
+    pr_warn("Cannot modify attributes of an unmapped page");
     return -1;
 }
 

@@ -242,7 +242,26 @@ phys_addr_t resolve_virt_addr(const virt_addr_t vaddr);
 int identity_map_mmio_page(const phys_addr_t addr);
 int raw_identity_map_mmio_page(struct cr3 *addr_space, const phys_addr_t addr);
 
-int add_page_attributes(const virt_addr_t page_start, const uint64_t attrs);
+typedef void (*page_attr_mod_t)(uint64_t*, const uint64_t);
+
+static void
+page_mod_add_attrs(uint64_t *page_attrs, const uint64_t attrs)
+{
+    *page_attrs |= attrs;
+}
+
+static void
+page_mod_replace_attrs(uint64_t *page_attrs, const uint64_t attrs)
+{
+    *page_attrs = attrs;
+}
+
+int
+modify_page_attributes(
+        const virt_addr_t page_start,
+        const uint64_t attrs,
+        page_attr_mod_t mod_op
+);
 
 #endif /* _HYVEMIND_X64_ASM_PGTABLES_H */
 
