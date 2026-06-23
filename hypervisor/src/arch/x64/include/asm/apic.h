@@ -4,8 +4,7 @@
 #include "cpufeatures.h"
 #include "processor.h"
 #include "mm_types.h"
-
-typedef uint32_t lapicid_t;
+#include "asm/arch_types.h"
 
 #define LAPIC_ID_REGISTER_OFFSET    0x20
 #define LAPIC_ID_REGISTER_ID_OFFSET 24
