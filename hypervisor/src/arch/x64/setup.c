@@ -56,6 +56,11 @@ query_max_leaf_values(void)
 static inline bool
 is_genuine_intel(void)
 {
+    if (!cpuid_leaf_in_range(CPUID_BRAND_STRING_LEAF)) {
+        pr_error("The brand string cpuid leaf is not supported");
+        return false;
+    }
+
     const cpuid_result_t result = cpuid_raw(CPUID_BRAND_STRING_LEAF, NO_SUBLEAF_INDEX);
 
     if (memcmp("Genu", (char *) &result.ebx, 4) != 0
@@ -72,18 +77,20 @@ all_cpu_features_supported(void)
 {
     cpuid_result_t result;
 
-    if (cpuid(CPUID_CPU_FEATURES_LEAF, NO_SUBLEAF_INDEX, &result) != 0) {
-        printf("Unable to query CPU feature information as leaf \"0x01\" is not supported");
+    if (!cpuid_leaf_in_range(CPUID_CPU_FEATURES_LEAF)) {
+        pr_error("Unable to query CPU feature information as the corresponding leaf is not supported");
         return false;
     }
 
+    result = cpuid_raw(CPUID_CPU_FEATURES_LEAF, NO_SUBLEAF_INDEX);
+
     if (IS_CLEAR(result.ecx, CPUID_VMX)) {
-        printf("The processor does not support the virtual machine extensions!");
+        pr_error("The processor does not support the virtual machine extensions!");
         return false;
     }
 
     if (IS_CLEAR(result.edx, CPUID_MSR)) {
-        printf("The processor does not support the 'rdmsr' and 'wrmsr' instructions");
+        pr_error("The processor does not support the 'rdmsr' and 'wrmsr' instructions");
         return false;
     }
 
@@ -99,19 +106,17 @@ static inline bool
 check_cpu(void)
 {
     if (!cpuid_supported()) {
-        printf("Procesor does not support CPUID");
+        pr_error("Procesor does not support CPUID");
         return false;
     }
 
-    query_max_leaf_values();
-
     if (!is_genuine_intel()) {
-        printf("Not a genuine Intel CPU");
+        pr_error("Not a genuine Intel CPU");
         return false;
     }
 
     if (!all_cpu_features_supported()) {
-        printf("Not all required CPU features are supported");
+        pr_error("Not all required CPU features are supported");
         return false;
     }
 
@@ -234,15 +239,17 @@ create_addr_space(void)
 void
 __arch_setup_bsp(void)
 {
+    if (check_cpu() == false) {
+        die_reason("Logical processor cannot support hyvemind operation");
+    }
+
     /* We map this into the bootloader provided page tables for early bootstraping */
     const phys_addr_t lapic_base = get_lapic_base();
     if (identity_map_mmio_page(lapic_base) != 0) {
         die_reason("Unable to identity map the APIC page");
     }
 
-    if (check_cpu() == false) {
-        die_reason("Logical processor cannot support hyvemind operation");
-    }
+    query_max_leaf_values();
 
     if (early_mm_init() != 0) {
         die_reason("Unable to identity basic cpu mm information");
@@ -283,6 +290,8 @@ arch_setup_ap(void)
 {
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
+
+    query_max_leaf_values();
 
     logical_processor_t *current = get_current_logical_processor();
     current->raw_cr3 = info->raw_shared_cr3;
