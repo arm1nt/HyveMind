@@ -1,6 +1,7 @@
 #include "fatal.h"
 #include "mm_types.h"
 #include "per-cpu.h"
+#include "sched.h"
 #include "string.h"
 #include "asm/apic.h"
 #include "asm/gdt_idt.h"
@@ -117,6 +118,69 @@ check_cpu(void)
     return true;
 }
 
+static inline bool
+enable_vmx_cr4(void)
+{
+    const uint64_t cr4 = read_cr4();
+    write_cr4(SET_BIT(cr4, CR4_VMXE));
+    return IS_SET(read_cr4(), CR4_VMXE);
+}
+
+static bool
+enable_ia32_feature_ctrl_vmx_support(void)
+{
+    uint64_t ftr_ctrl = read_msr(MSRX64_IA32_FEATURE_CONTROL_MSR);
+
+    if (IS_SET(ftr_ctrl, MSRX64_FTR_CTRL_LOCKED)) {
+
+        if (IS_CLEAR(ftr_ctrl, MSRX64_FTR_CTRL_VMX_IN_SMX)) {
+            /* Not relevant for us */
+            pr_debug("VMX operation cannot be enabled in SMX operation");
+        }
+
+        if (IS_CLEAR(ftr_ctrl, MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX)) {
+            pr_error(
+                    "Feature lock bit is already set and VMX operation is "
+                    "configured to be prohibited outside of SMX operation"
+            );
+            return false;
+        }
+
+        return true;
+    } else {
+        /**
+         * If the supported feature selection is not yet locked, make sure
+         * VMX operation is supported in any case and then lock the selection
+         */
+        ftr_ctrl = SET_BIT(
+                ftr_ctrl,
+                MSRX64_FTR_CTRL_VMX_IN_SMX
+                | MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX
+                | MSRX64_FTR_CTRL_LOCKED
+        );
+
+        write_msr(MSRX64_IA32_FEATURE_CONTROL_MSR, ftr_ctrl);
+        return true;
+    }
+
+    return false;
+}
+
+static inline bool
+enable_vmx_feature_support(void)
+{
+    if (!enable_vmx_cr4()) {
+        pr_error("Unable to set VMX enable bit in CR4");
+        return false;
+    }
+
+    if (!enable_ia32_feature_ctrl_vmx_support()) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool
 create_addr_space(void)
 {
@@ -202,6 +266,10 @@ __arch_setup_bsp(void)
 
     init_shared_idt();
     load_shared_idt();
+
+    if (!enable_vmx_feature_support()) {
+        die_reason("Unable to enable VMX support for BSP");
+    }
 }
 
 extern uint8_t boot_info_scratch[];
@@ -213,10 +281,13 @@ struct shared_boot_info {
 static void __no_return
 arch_setup_ap(void)
 {
-    arch_rebase_current_stack(DEFAULT_HYV_THREAD_STACK_SIZE, 1);
-
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
+
+    logical_processor_t *current = get_current_logical_processor();
+    current->raw_cr3 = info->raw_shared_cr3;
+    current->lapic_id = read_lapic_id();
+    current->processor_id = get_current_cpuid();
 
     init_new_gdt();
     install_new_tss();
@@ -224,6 +295,14 @@ arch_setup_ap(void)
 
     load_shared_idt();
 
+    if (!enable_vmx_feature_support()) {
+        current->state = PROCESSOR_UNAVAILABLE;
+        die_reason("Cannot enable VMX support for processor");
+    }
+
+    current->state = PROCESSOR_INIT;
+    /* rebase before we enter the idle loop and not here */
+    arch_rebase_current_stack(DEFAULT_HYV_THREAD_STACK_SIZE, 1);
     die_reason("and dead.");
 }
 
@@ -240,9 +319,8 @@ arch_setup_ap_limine(const struct limine_mp_info *info)
 void
 arch_bringup_aps_limine(const struct limine_mp_response *mp_info)
 {
-
     const lapicid_t curr_lapic_id = read_lapic_id();
-    const logical_processor_t *bsp = percpu_ptr(logical_processor);
+    const logical_processor_t *bsp = get_current_logical_processor();
 
     struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     info->raw_shared_cr3 = bsp->raw_cr3;

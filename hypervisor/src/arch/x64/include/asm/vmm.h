@@ -11,6 +11,7 @@ enum logical_processor_state {
     PROCESSOR_UNAVAILABLE,
     /* If we don't want to use the certain logical processor */
     PROCESSOR_DISABLED,
+    PROCESSOR_INIT,
     PROCESSOR_IDLE,
     PROCESSOR_BUSY
 };
@@ -42,7 +43,12 @@ typedef struct logical_processor logical_processor_t;
 DECLARE_PER_CPU(logical_processor_t, logical_processor);
 
 logical_processor_t get_logical_processor_by_id(const cpuid_t id);
-logical_processor_t get_current_logical_processor(void);
+
+static inline logical_processor_t *
+get_current_logical_processor(void)
+{
+    return (logical_processor_t*) percpu_ptr(logical_processor);
+}
 
 #endif /* _HYVEMIND_X64_ASM_VMM_H */
 
