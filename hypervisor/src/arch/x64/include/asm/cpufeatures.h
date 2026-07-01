@@ -49,6 +49,8 @@
 #define MSRX64_IA32_APIC_BASE               0x1B
 #define MSR_APIC_BASE_EXTD_BIT              10
 #define MSR_APIC_BASE_EXTD                  (U64_LSHIFT(1, MSR_APIC_BASE_EXTD_BIT))
+#define MSR_APIC_BASE_EN_BIT                11
+#define MSR_APIC_BASE_EN                    (U64_LSHIFT(1, MSR_APIC_BASE_EN_BIT))
 
 #define MSR_X2APIC_LAPIC_ID_REGISTER        0x802
 
