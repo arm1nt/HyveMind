@@ -9,5 +9,7 @@
 
 #define APIC_SPURIOUS_VECTOR        0xff
 
+#define APIC_TIMER_TEST_VECTOR      0xee
+
 #endif /*  _HYVEMIND_X64_ASM_IRQ_VECTORS_H */
 

@@ -9,6 +9,7 @@
 #define LAPIC_ID_REGISTER_OFFSET    0x20
 #define LAPIC_ID_REGISTER_ID_OFFSET 24
 
+
 static inline unsigned int
 get_max_apic_addr(void)
 {
@@ -60,6 +61,30 @@ read_lapic_id(void)
         return read_xapic_lapic_id();
     }
 }
+
+enum dcr_value {
+    DCR_DIV2,
+    DCR_DIV4,
+    DCR_DIV8,
+    DCR_DIV16,
+    DCR_DIV32,
+    DCR_DIV64,
+    DCR_DIV128,
+    DCR_DIV1
+};
+
+bool setup_local_apic(void);
+
+void apic_software_enable(void);
+void apic_software_disable(void);
+void apic_signal_eoi(void);
+void apic_set_task_priority(const int priority_class);
+void apic_mask_all_local_interrupts(void);
+
+void start_one_shot_apic_timer(const uint64_t initial_count, const enum dcr_value div);
+void start_periodic_apic_timer(const uint64_t start_count, const enum dcr_value div);
+
+void apic_send_targeted_ipi_fixed(const lapicid_t target_id, const uint8_t vector);
 
 #endif /* _HYVEMIND_X64_ASM_APIC_H */
 
