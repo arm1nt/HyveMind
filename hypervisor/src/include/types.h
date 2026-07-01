@@ -28,14 +28,16 @@
 #define IS_SET(val, mask)       (val & mask)
 #define IS_CLEAR(val, mask)     ((val & mask) == 0)
 
-#define BUILD_LEFT_SHIFT(type, val, shift)  (((type) val) << shift)
-#define BUILD_RIGHT_SHIFT(type, val, shift) (((type) val) >> shift)
+#define BUILD_LEFT_SHIFT(type, val, shift)  (((type) (val)) << (shift))
+#define BUILD_RIGHT_SHIFT(type, val, shift) (((type) (val)) >> (shift))
 
 #define U8_LSHIFT(val, shift) BUILD_LEFT_SHIFT(uint8_t, val, shift)
 #define U8_RSHIFT(val, shift) BUILD_RIGHT_SHIFT(uint8_t, val, shift)
 
 #define U8_WRAP_RSHIFT(val) (U8_LSHIFT(val, 7) | U8_RSHIFT(val, 1))
 
+#define U32_LSHIFT(val, shift) BUILD_LEFT_SHIFT(uint32_t, val, shift)
+#define U32_RSHIFT(val, shift) BUILD_RIGHT_SHIFT(uint32_t, val, shift)
 #define U64_LSHIFT(val, shift) BUILD_LEFT_SHIFT(uint64_t, val, shift)
 #define U64_RSHIFT(val, shift) BUILD_RIGHT_SHIFT(uint64_t, val, shift)
 
