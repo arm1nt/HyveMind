@@ -3,15 +3,7 @@
 
 #ifndef __ASSEMBLER__
 
-#define DIVIDE_ERROR_VECTOR                 0
-#define NMI_INTERRUPT_VECTOR                2
-#define INVALID_OPCODE_VECTOR               6
-#define DOUBLE_FAULT_VECTOR                 8
-#define GENERAL_PROTECTION_VECTOR           13
-#define PAGE_FAULT_VECTOR                   14
-#define VIRTUALIZATION_EXCEPTION_VECTOR     20
-#define CONTROL_PROTECTION_EXCEPTION_VECTOR 21
-
+#include "asm/irq_vectors.h"
 
 #define DECLARE_IDT_ASM_TRAMPOLINE(name, cfunc) extern void name(void);
 

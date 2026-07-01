@@ -89,8 +89,7 @@ init_shared_idt(void)
 {
     memset(&idt, 0, sizeof(struct idt_struct));
 
-    REGISTER_TRAP_GATE(&idt, DIVIDE_ERROR_VECTOR, asm_div_exception_handler, TSS_IST_INDEX0);
-    REGISTER_TRAP_GATE(&idt, DOUBLE_FAULT_VECTOR, asm_double_fault_handler, TSS_IST_INDEX1);
+    REGISTER_TRAP_GATE(&idt, IRQ_DOUBLE_FAULT_VECTOR, asm_double_fault_handler, TSS_IST_INDEX1);
 }
 
 void
