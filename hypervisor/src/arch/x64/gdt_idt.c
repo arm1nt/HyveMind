@@ -51,7 +51,7 @@ create_idt_gate(const virt_addr_t handler_addr, const sys_seg_type_t type, const
 static inline void
 write_idt_entry(struct idt_struct *idt, const int index, const idt_gate_t gate)
 {
-    memcpy(&idt->gates[index], &gate, sizeof(idt_gate_t));
+    memcpy(((uint8_t *)idt) + (index * 16), &gate, sizeof(idt_gate_t));
 }
 
 static inline void
@@ -89,7 +89,7 @@ init_shared_idt(void)
 {
     memset(&idt, 0, sizeof(struct idt_struct));
 
-    REGISTER_TRAP_GATE(&idt, IRQ_DOUBLE_FAULT_VECTOR, asm_double_fault_handler, TSS_IST_INDEX1);
+    REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, 0);
 }
 
 void
