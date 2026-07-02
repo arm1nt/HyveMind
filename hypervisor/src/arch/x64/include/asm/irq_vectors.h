@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_X64_ASM_IRQ_VECTORS_H
 #define _HYVEMIND_X64_ASM_IRQ_VECTORS_H
 
+#define IRQ_DIVIDE_ERROR_VECTOR     0x00
 #define IRQ_NMI_VECTOR              0x02
 #define IRQ_DOUBLE_FAULT_VECTOR     0x08
 #define IRQ_GP_VECTOR               0x0d
@@ -9,7 +10,11 @@
 
 #define APIC_SPURIOUS_VECTOR        0xff
 
-#define APIC_TIMER_TEST_VECTOR      0xee
+#define APIC_ONESHOT_TIMER_VECTOR   0x30
+#define APIC_PERIODIC_TIMER_VECTOR  0x31
+#define APIC_DEADLINE_TIMER_VECTOR  0x32
+
+#define IRQ_RESCHEDULE_VECTOR       0x50
 
 #endif /*  _HYVEMIND_X64_ASM_IRQ_VECTORS_H */
 

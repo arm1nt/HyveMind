@@ -62,6 +62,25 @@ read_lapic_id(void)
     }
 }
 
+enum tpr_priority {
+    TPR_PRIO0,
+    TPR_PRIO1,
+    TPR_PRIO2,
+    TPR_PRIO3,
+    TPR_PRIO4,
+    TPR_PRIO5,
+    TPR_PRIO6,
+    TPR_PRIO7,
+    TPR_PRIO8,
+    TPR_PRIO9,
+    TPR_PRIO10,
+    TPR_PRIO11,
+    TPR_PRIO12,
+    TPR_PRIO13,
+    TPR_PRIO14,
+    TPR_PRIO15,
+};
+
 enum dcr_value {
     DCR_DIV2,
     DCR_DIV4,
@@ -78,12 +97,13 @@ bool setup_local_apic(void);
 void apic_software_enable(void);
 void apic_software_disable(void);
 void apic_signal_eoi(void);
-void apic_set_task_priority(const int priority_class);
+void apic_set_task_priority(const enum tpr_priority priority);
 void apic_mask_all_local_interrupts(void);
 
-void start_one_shot_apic_timer(const uint64_t initial_count, const enum dcr_value div);
-void start_periodic_apic_timer(const uint64_t start_count, const enum dcr_value div);
+void apic_start_one_shot_timer(const uint32_t initial_count, const enum dcr_value div);
+void apic_start_periodic_timer(const uint64_t start_count, const enum dcr_value div);
 
+void apic_send_self_ipi(const uint8_t vector);
 void apic_send_targeted_ipi_fixed(const lapicid_t target_id, const uint8_t vector);
 
 #endif /* _HYVEMIND_X64_ASM_APIC_H */

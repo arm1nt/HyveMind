@@ -3,6 +3,7 @@
 #include "asm/apic.h"
 #include "asm/irq_vectors.h"
 #include "asm/processor.h"
+#include "asm/pgtables.h"
 
 enum x2apic_register_msr {
     X2APIC_LAPIC_ID_REGISTER            = 0x802,
@@ -17,6 +18,9 @@ enum x2apic_register_msr {
     X2APIC_LVT_LINT0_REGISTER           = 0x835,
     X2APIC_LVT_LINT1_REGISTER           = 0x836,
     X2APIC_LVT_ERROR_REGISTER           = 0x837,
+    X2APIC_INITIAL_COUNT_REGISTER       = 0x838,
+    X2APIC_CURRENT_COUNT_REGISTER       = 0x839,
+    X2APIC_DIVIDE_CONFIG_REGISTER       = 0x83E,
     X2APIC_SELF_IPI_REGISTER            = 0x83F,
 };
 
@@ -26,7 +30,8 @@ enum x2apic_register_msr {
 #define SVR_SOFTWARE_ENABLE_DISABLE_BIT 8
 #define SVR_SOFTWARE_ENABLE_DISABLE (U32_LSHIFT(1, SVR_SOFTWARE_ENABLE_DISABLE_BIT))
 
-#define APIC_EOI_ACK 0x01
+/* Must be 0, any other value will cause a GP */
+#define APIC_EOI_ACK 0x00
 
 enum lapic_timer_type {
      TIMER_ONE_SHOT,
@@ -35,10 +40,10 @@ enum lapic_timer_type {
 };
 
 void
-apic_signal_eoi(void)
+apic_send_self_ipi(const uint8_t vector)
 {
     if (in_x2apic_mode()) {
-        write_msr(X2APIC_EOI_REGISTER, APIC_EOI_ACK);
+        write_msr(X2APIC_SELF_IPI_REGISTER, vector);
     }
 }
 
@@ -48,10 +53,18 @@ apic_send_targeted_ipi_fixed(const lapicid_t target_id, const uint8_t vector)
     return;
 }
 
-inline void
-apic_set_task_priority(const int priority_class)
+void
+apic_signal_eoi(void)
 {
-    write_cr8(priority_class);
+    if (in_x2apic_mode()) {
+        write_msr(X2APIC_EOI_REGISTER, APIC_EOI_ACK);
+    }
+}
+
+inline void
+apic_set_task_priority(const enum tpr_priority priority)
+{
+    write_cr8(priority);
 }
 
 static inline void
@@ -79,25 +92,55 @@ x2apic_set_lvt_entry_vector(const enum x2apic_register_msr reg, const uint8_t ve
 static inline void
 x2apic_lvt_timer_set_type(const enum lapic_timer_type timer_type)
 {
-    return;
+    const uint32_t clear_mask = ~(U32(3) << 17);
+    uint32_t lvt_timer = read_msr(X2APIC_LVT_TIMER_REGISTER);
+
+    lvt_timer &= clear_mask;
+    lvt_timer |= (U32(timer_type) << 17);
+    write_msr(X2APIC_LVT_TIMER_REGISTER, lvt_timer);
+}
+
+static inline void
+x2apic_set_div_config_value(const enum dcr_value div_value)
+{
+    const uint8_t leading_bit = div_value >> 2;
+    const uint8_t trailing_bits = div_value & 3;
+
+    write_msr(X2APIC_DIVIDE_CONFIG_REGISTER, (leading_bit << 3) | trailing_bits);
 }
 
 void
-start_one_shot_apic_timer(const uint64_t initial_count, const enum dcr_value div)
+apic_start_one_shot_timer(const uint32_t initial_count, const enum dcr_value div)
 {
-    x2apic_set_lvt_entry_vector(X2APIC_LVT_TIMER_REGISTER, APIC_TIMER_TEST_VECTOR);
-    x2apic_lvt_timer_set_type(TIMER_ONE_SHOT);
+    if (in_x2apic_mode()) {
+        x2apic_set_lvt_entry_vector(X2APIC_LVT_TIMER_REGISTER, APIC_ONESHOT_TIMER_VECTOR);
+        x2apic_lvt_timer_set_type(TIMER_ONE_SHOT);
 
-    return;
+        write_msr(X2APIC_INITIAL_COUNT_REGISTER, 0);
+        x2apic_set_div_config_value(div);
+
+        x2apic_unmask_lvt_entry(X2APIC_LVT_TIMER_REGISTER);
+
+        /* arm the timer */
+        write_msr(X2APIC_INITIAL_COUNT_REGISTER, initial_count);
+    }
 }
 
 void
-start_periodic_apic_timer(const uint64_t start_count, const enum dcr_value div)
+apic_start_periodic_timer(const uint64_t start_count, const enum dcr_value div)
 {
-    x2apic_set_lvt_entry_vector(X2APIC_LVT_TIMER_REGISTER, APIC_TIMER_TEST_VECTOR);
-    x2apic_lvt_timer_set_type(TIMER_PERIODIC);
+    if (in_x2apic_mode()) {
+        x2apic_set_lvt_entry_vector(X2APIC_LVT_TIMER_REGISTER, APIC_PERIODIC_TIMER_VECTOR);
+        x2apic_lvt_timer_set_type(TIMER_PERIODIC);
 
-    return;
+        write_msr(X2APIC_INITIAL_COUNT_REGISTER, 0);
+        x2apic_set_div_config_value(div);
+
+        x2apic_unmask_lvt_entry(X2APIC_LVT_TIMER_REGISTER);
+
+        /* arm the timer */
+        write_msr(X2APIC_INITIAL_COUNT_REGISTER, start_count);
+    }
 }
 
 inline void
@@ -119,8 +162,8 @@ set_spurious_interrupt_vector(void)
 {
     if (in_x2apic_mode()) {
         uint32_t svr = read_msr(X2APIC_SVR);
-        svr = svr & U8(0);
-        svr |= APIC_SPURIOUS_VECTOR;
+        svr = (svr >> 8) << 8;
+        svr |= U8(APIC_SPURIOUS_VECTOR);
         write_msr(X2APIC_SVR, svr);
     }
 }
@@ -132,11 +175,26 @@ x2apic_software_enable(void)
     write_msr(X2APIC_SVR, svr | SVR_SOFTWARE_ENABLE_DISABLE);
 }
 
+static inline void
+x2apic_software_disable(void)
+{
+    const uint32_t svr = read_msr(X2APIC_SVR);
+    write_msr(X2APIC_SVR, svr & (~SVR_SOFTWARE_ENABLE_DISABLE));
+}
+
 inline void
 apic_software_enable(void)
 {
     if (in_x2apic_mode()) {
         x2apic_software_enable();
+    }
+}
+
+inline void
+apic_software_disable(void)
+{
+    if (in_x2apic_mode()) {
+        x2apic_software_disable();
     }
 }
 
@@ -185,10 +243,8 @@ x2apic_setup_local_apic(void)
 
     apic_mask_all_local_interrupts();
     set_spurious_interrupt_vector();
-
     /* Disallow the first two irq priority classes (vectors 0-31) from being delivered */
-    apic_set_task_priority(0x01);
-
+    apic_set_task_priority(TPR_PRIO1);
     /* Ensure we are enabled */
     apic_software_enable();
 
@@ -199,9 +255,15 @@ static inline bool
 xapic_setup_local_apic(void)
 {
     /**
-     * We'll focus on x2apic mode support, especially since xapic mode
-     * is being deprecated.
+     * We mainly focus on x2apic mode, especially since xapic mode is being
+     * deprecated.
      */
+    const phys_addr_t lapic_base = get_lapic_base();
+    if (identity_map_mmio_page(lapic_base) != 0) {
+        pr_error("Unable to map lapic page");
+        return false;
+    }
+
     return false;
 }
 
