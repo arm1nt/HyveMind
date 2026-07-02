@@ -11,15 +11,15 @@ DEFINE_PER_CPU_ALIGNED(struct gdt_struct, gdt_tables, PAGE_SIZE);
 static struct idt_struct idt;
 
 void
-c_div_exception_handler(void)
+__div_exception_handler(void)
 {
     printf("Inside the c_div_exception_handler function");
 }
 
 void
-c_double_fault_handler(void)
+__apic_oneshot_timer_handler(void)
 {
-    printf("Inside the c_double_fault_handler function");
+    printf("apic oneshot timer fired");
 }
 
 static inline void
@@ -90,6 +90,7 @@ init_shared_idt(void)
     memset(&idt, 0, sizeof(struct idt_struct));
 
     REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, 0);
+    REGISTER_INTERRUPT_GATE(&idt, APIC_ONESHOT_TIMER_VECTOR, asm_irq_apic_oneshot_timer_handler, TSS_IST_INDEX1);
 }
 
 void
