@@ -31,9 +31,14 @@ qemu_run_iso_uefi: qemu_get_ovmf $(TARGET_ISO)
 	$(Q)echo "Starting $(NAME)..."
 	$(Q)qemu-system-x86_64 \
 		-cpu host,+vmx \
+		-enable-kvm \
+		-no-reboot \
+		-no-shutdown \
+		-d int \
+		-d cpu_reset \
+		-D qemu.log \
 		-smp 2 \
 		-m 15G \
-		-enable-kvm \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
 		-cdrom $(TARGET_ISO) \
 		-boot d \
