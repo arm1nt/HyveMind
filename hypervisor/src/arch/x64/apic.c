@@ -39,6 +39,47 @@ enum lapic_timer_type {
      TIMER_TSC_DEADLINE
 };
 
+enum icr_delivery_mode {
+    DELIVERY_MODE_FIXED,
+    DELIVERY_MODE_LOWEST_PRIO,
+    DELIVERY_MODE_NMI = 0b100,
+};
+
+enum icr_destination_mode {
+    DESTINATION_MODE_PHYSICAL,
+    DESTINATION_MODE_LOGICAL,
+};
+
+static inline void
+set_icr_vector(uint64_t *icr, const uint8_t vector)
+{
+    *icr = *icr | vector;
+}
+
+static inline void
+set_icr_delivery_mode(uint64_t *icr, const enum icr_delivery_mode mode)
+{
+    *icr = *icr | (U64(mode) << 8);
+}
+
+static inline void
+set_icr_destination_mode(uint64_t *icr, const enum icr_destination_mode mode)
+{
+    *icr = *icr | (U64(mode) << 11);
+}
+
+static inline void
+set_icr_level(uint64_t *icr)
+{
+    *icr = *icr | (U64(1) << 14);
+}
+
+static inline void
+set_icr_destination(uint64_t *icr, const lapicid_t target)
+{
+    *icr = *icr | (U64(target) << 32);
+}
+
 void
 apic_send_self_ipi(const uint8_t vector)
 {
@@ -48,9 +89,25 @@ apic_send_self_ipi(const uint8_t vector)
 }
 
 void
+apic_send_targeted_sched_ipi(const lapicid_t target_id)
+{
+    apic_send_targeted_ipi_fixed(target_id, IRQ_SCHEDULE_VECTOR);
+}
+
+inline void
 apic_send_targeted_ipi_fixed(const lapicid_t target_id, const uint8_t vector)
 {
-    return;
+    uint64_t icr = 0;
+
+    set_icr_vector(&icr, vector);
+    set_icr_delivery_mode(&icr, DELIVERY_MODE_FIXED);
+    set_icr_destination_mode(&icr, DESTINATION_MODE_PHYSICAL);
+    set_icr_level(&icr);
+
+    if (in_x2apic_mode()) {
+        set_icr_destination(&icr, target_id);
+        write_msr(X2APIC_ICR, icr);
+    }
 }
 
 void

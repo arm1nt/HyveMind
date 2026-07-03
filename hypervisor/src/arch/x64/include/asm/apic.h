@@ -104,6 +104,7 @@ void apic_start_one_shot_timer(const uint32_t initial_count, const enum dcr_valu
 void apic_start_periodic_timer(const uint64_t start_count, const enum dcr_value div);
 
 void apic_send_self_ipi(const uint8_t vector);
+void apic_send_targeted_sched_ipi(const lapicid_t target_id);
 void apic_send_targeted_ipi_fixed(const lapicid_t target_id, const uint8_t vector);
 
 #endif /* _HYVEMIND_X64_ASM_APIC_H */
