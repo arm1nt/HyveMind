@@ -129,7 +129,7 @@ _load_gdt(const struct gdt_struct *gdt)
     asm volatile ("LGDT %0" :: "m"(install_ptr));
 }
 
-int
+void
 init_new_gdt(void)
 {
     struct gdt_struct *gdt_table = percpu_ptr(gdt_tables);
@@ -137,8 +137,6 @@ init_new_gdt(void)
     memset(gdt_table, 0, sizeof(*gdt_table));
     write_gdt_entry(gdt_table, &hyvemind_cs_segment_desc, HYVEMIND_CS_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
     write_gdt_entry(gdt_table, &hyvemind_data_segment_desc, HYVEMIND_DATA_SEGMENT_INDEX, CODE_DATA_SEGMENT_DESC);
-
-    return 0;
 }
 
 int
@@ -157,7 +155,7 @@ install_new_tss(void)
     return 0;
 }
 
-int
+void
 load_gdt(void)
 {
     _load_gdt(percpu_ptr(gdt_tables));
@@ -174,7 +172,5 @@ load_gdt(void)
 
     segment_selector_t tss_selector = GDT_SELECTOR(HYVEMIND_TSS_INDEX, TI_GDT, 0);
     reload_tr_register(&tss_selector);
-
-    return 0;
 }
 

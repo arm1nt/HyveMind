@@ -64,9 +64,9 @@ static segment_descriptor_t hyvemind_cs_segment_desc =
 static segment_descriptor_t hyvemind_data_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, DATA_RW_EXPAND_DOWN, 0, 0);
 
-int init_new_gdt(void);
+void init_new_gdt(void);
 int install_new_tss(void);
-int load_gdt(void);
+void load_gdt(void);
 
 void init_shared_idt(void);
 void load_shared_idt(void);

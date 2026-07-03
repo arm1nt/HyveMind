@@ -39,7 +39,7 @@ cpuid_supported(void)
 }
 
 static inline void
-query_max_leaf_values(void)
+query_processor_max_leaf_values(void)
 {
     cpuid_result_t result;
 
@@ -243,13 +243,11 @@ __arch_setup_bsp(void)
         die_reason("Logical processor cannot support hyvemind operation");
     }
 
-    /* We map this into the bootloader provided page tables for early bootstraping */
-    const phys_addr_t lapic_base = get_lapic_base();
-    if (identity_map_mmio_page(lapic_base) != 0) {
-        die_reason("Unable to identity map the APIC page");
+    if (!setup_local_apic()) {
+        die_reason("Failed to setup the local apic");
     }
 
-    query_max_leaf_values();
+    query_processor_max_leaf_values();
 
     if (early_mm_init() != 0) {
         die_reason("Unable to identity basic cpu mm information");
@@ -259,17 +257,13 @@ __arch_setup_bsp(void)
         die_reason("Failed to the address space of the BSP");
     }
 
-    if (init_new_gdt() != 0) {
-        die_reason("Failed to create a GDT for the BSP");
-    }
+    init_new_gdt();
 
     if (install_new_tss() != 0) {
         die_reason("Failed to install a TSS into the GDT of the BSP");
     }
 
-    if (load_gdt() != 0) {
-        die_reason("Failed to load the GDT for the BSP");
-    }
+    load_gdt();
 
     init_shared_idt();
     load_shared_idt();
@@ -291,7 +285,11 @@ arch_setup_ap(void)
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
 
-    query_max_leaf_values();
+    if (!setup_local_apic()) {
+        die_reason("Failed to setup local apic");
+    }
+
+    query_processor_max_leaf_values();
 
     logical_processor_t *current = get_current_logical_processor();
     current->raw_cr3 = info->raw_shared_cr3;
@@ -299,9 +297,13 @@ arch_setup_ap(void)
     current->processor_id = get_current_cpuid();
 
     init_new_gdt();
-    install_new_tss();
-    load_gdt();
 
+    if (install_new_tss() != 0) {
+        current->state = PROCESSOR_UNAVAILABLE;
+        die_reason("Failed to install TSS for AP");
+    }
+
+    load_gdt();
     load_shared_idt();
 
     if (!enable_vmx_feature_support()) {
