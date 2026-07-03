@@ -25,7 +25,18 @@
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
 
-
+#define EFLAGS_CF_BIT                           0 /* carry flag */
+#define EFLAGS_CF                               U64_LSHIFT(1, EFLAGS_CF_BIT)
+#define EFLAGS_PF_BIT                           2 /* parity flag */
+#define EFLAGS_PF                               U64_LSHIFT(1, EFLAGS_PF_BIT)
+#define EFLAGS_AF_BIT                           4 /* auxilliary carry flag */
+#define EFLAGS_AF                               U64_LSHIFT(1, EFLAGS_AF_BIT)
+#define EFLAGS_ZF_BIT                           6 /* zero flag */
+#define EFLAGS_ZF                               U64_LSHIFT(1, EFLAGS_ZF_BIT)
+#define EFLAGS_SF_BIT                           7 /* sign flag */
+#define EFLAGS_SF                               U64_LSHIFT(1, EFLAGS_SF_BIT)
+#define EFLAGS_OF_BIT                           11 /* overflow flag */
+#define EFLAGS_OF                               U64_LSHIFT(1, EFLAGS_OF_BIT)
 #define EFLAGS_VM_BIT                           17 /* Virtual-8086 mode */
 #define EFLAGS_VM                               U64_LSHIFT(1, EFLAGS_VM_BIT)
 #define EFLAGS_ID_BIT                           21 /* Identification bit */
