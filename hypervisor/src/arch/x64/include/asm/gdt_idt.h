@@ -67,9 +67,11 @@ static segment_descriptor_t hyvemind_data_segment_desc =
 void init_new_gdt(void);
 int install_new_tss(void);
 void load_gdt(void);
+gdt_ptr_t read_gdtr(void);
 
 void init_shared_idt(void);
 void load_shared_idt(void);
+idt_ptr_t read_idtr(void);
 
 #endif /* _HYVEMIND_ASM_X64_GDT_IDT_H */
 

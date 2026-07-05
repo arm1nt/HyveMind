@@ -22,6 +22,11 @@ __apic_oneshot_timer_handler(void)
     printf("apic oneshot timer fired");
 }
 
+void
+__apic_schedule_ipi_handler(void)
+{
+}
+
 static inline void
 set_idt_gate_offset(idt_gate_t *gate, const uint64_t offset)
 {
@@ -89,7 +94,7 @@ init_shared_idt(void)
 {
     memset(&idt, 0, sizeof(struct idt_struct));
 
-    REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, 0);
+    REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, TSS_IST_INDEX0);
     REGISTER_INTERRUPT_GATE(&idt, APIC_ONESHOT_TIMER_VECTOR, asm_irq_apic_oneshot_timer_handler, TSS_IST_INDEX1);
 }
 
@@ -97,6 +102,14 @@ void
 load_shared_idt(void)
 {
     _load_idt(&idt);
+}
+
+idt_ptr_t
+read_idtr(void)
+{
+    idt_ptr_t idtr;
+    asm volatile("SIDT %0" : "=m"(idtr) :: "memory");
+    return idtr;
 }
 
 static inline void
@@ -172,5 +185,13 @@ load_gdt(void)
 
     segment_selector_t tss_selector = GDT_SELECTOR(HYVEMIND_TSS_INDEX, TI_GDT, 0);
     reload_tr_register(&tss_selector);
+}
+
+gdt_ptr_t
+read_gdtr(void)
+{
+    gdt_ptr_t gdtr;
+    asm volatile ("SGDT %0" : "=m"(gdtr) :: "memory");
+    return gdtr;
 }
 
