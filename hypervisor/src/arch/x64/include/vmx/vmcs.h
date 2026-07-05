@@ -1,8 +1,13 @@
 #ifndef _HYVEMIND_X64_VMX_VMCS_H
 #define _HYVEMIND_X64_VMX_VMCS_H
 
-#include "mm_types.h"
 #include <stdint.h>
+
+enum vmcs_launch_state {
+    VMCS_LS_INVALID,
+    VMCS_LS_CLEAR,
+    VMCS_LS_LAUNCHED,
+};
 
 struct vmcs_hdr {
     uint32_t revision_id: 31,
@@ -15,8 +20,6 @@ struct vmcs {
     uint8_t data[];
 };
 
-phys_addr_t create_new_vmcs_region(void);
-
 struct vmcs_component_encoding {
     uint32_t access_type    : 1,
              index          : 9,
@@ -24,6 +27,35 @@ struct vmcs_component_encoding {
              reserved0      : 1,
              width          : 2,
              reserved1      : 17;
+};
+
+enum vmcs_instruction_error {
+    VMCS_INS_NO_ERROR,
+    VMCALL_IN_VMX_ROOT,
+    VMCLEAR_WITH_INVALID_PADDR,
+    VMCLEAR_WITH_VMXON_PTR,
+    VMLAUNCH_WITH_NONCLEAR_VMCS,
+    VMRESUME_WITH_NONLAUNCHED_VMCS,
+    VMRESUME_AFTER_VMXOFF,
+    VM_ENTRY_WITH_INVALID_CTRL_FIELDS,
+    VM_ENTRY_WITH_INVALID_HOST_STATE_FIELDS,
+    VMPTRLD_WITH_INVALID_PADDR,
+    VMPTRLD_WITH_VMXON_PTR,
+    VMPTRLD_WITH_INVALID_VMCS_REVISION_ID,
+    VMREAD_VMWRITE_TO_UNSUPPORTED_VMCS_COMPONENT,
+    VMWMRITE_TO_RDONLY_VMCS_COMPONENT,
+    VMXON_IN_VMX_ROOT,
+    VM_ENTRY_WITH_INVALID_EXECUTIVE_VMCS_PTR,
+    VM_ENTRY_WITH_NONLAUNCHED_EXECUTIVE_VMCS,
+    VM_ENTRY_WITH_EXECUTIVE_VMCS_PTR_NOT_VMXON_PTR,
+    VMCALL_WITH_NONCLEAR_VMCS,
+    VMCALL_WITH_INVALID_VM_EXIT_CTRL_FIELDS,
+    VMCALL_WITH_INCORRECT_MSEG_REV_ID,
+    VMXOFF_UNDER_DUAL_MONITOR,
+    VMCALL_WITH_INVALID_SMM_FTRS,
+    VM_ENTRY_WITH_INVALID_EXECUTION_CTRL_FIELDS_IN_EXECUTIVE_VMCS,
+    VM_ENTRY_WITH_EVENTS_BLOCKED_BY_MOV_SS,
+    INVALID_OPERAND_TO_INVEPT_INVVPID
 };
 
 enum vmcs_field_encoding {
