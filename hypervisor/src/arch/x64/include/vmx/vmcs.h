@@ -1,7 +1,9 @@
 #ifndef _HYVEMIND_X64_VMX_VMCS_H
 #define _HYVEMIND_X64_VMX_VMCS_H
 
-#include <stdint.h>
+#include "hyvstdlib.h"
+
+#define NO_CURRENT_VMCS_ADDR 0xFFFFFFFFFFFFFFFF
 
 enum vmcs_launch_state {
     VMCS_LS_INVALID,
@@ -29,7 +31,10 @@ struct vmcs_component_encoding {
              reserved1      : 17;
 };
 
-enum vmcs_instruction_error {
+#define VM_INS_ERROR_MIN_VALUE 1
+#define VM_INS_ERROR_MAX_VALUE 28
+
+enum vm_instruction_error {
     VMCS_INS_NO_ERROR,
     VMCALL_IN_VMX_ROOT,
     VMCLEAR_WITH_INVALID_PADDR,
@@ -58,7 +63,13 @@ enum vmcs_instruction_error {
     INVALID_OPERAND_TO_INVEPT_INVVPID
 };
 
-enum vmcs_field_encoding {
+static inline bool
+is_valid_vm_ins_error(const int val)
+{
+    return (VM_INS_ERROR_MIN_VALUE <= val) && (val <= VM_INS_ERROR_MAX_VALUE);
+}
+
+enum vmcs_field_encoding: uint64_t {
     /* 16 bit fields */
     VIRTUAL_PROCESSOR_ID                    = 0x00000000,
     POSTED_INTERRUPT_NOTIFICATION_VECTOR    = 0x00000002,
