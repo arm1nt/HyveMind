@@ -69,6 +69,21 @@ is_valid_vm_ins_error(const int val)
     return (VM_INS_ERROR_MIN_VALUE <= val) && (val <= VM_INS_ERROR_MAX_VALUE);
 }
 
+union guest_state_access_rights {
+    uint32_t raw;
+    uint32_t segment_type: 4,
+             descriptor_type: 1,
+             dpl: 2,
+             present: 1,
+             reserved0: 4,
+             avl: 1,
+             l: 1,
+             db: 1,
+             g: 1,
+             segment_usable: 1,
+             reserved1: 15;
+};
+
 enum vmcs_field_encoding: uint64_t {
     /* 16 bit fields */
     VIRTUAL_PROCESSOR_ID                    = 0x00000000,

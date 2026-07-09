@@ -97,6 +97,8 @@ typedef struct segment_descriptor segment_descriptor_t;
         .rpl = (_rpl)                               \
     }
 
+#define NULL_SEG_SELECTOR DEFINE_SEGMENT_SELECTOR(0,0,0)
+
 struct segment_regs {
     segment_selector_t cs;
     segment_selector_t ds;
