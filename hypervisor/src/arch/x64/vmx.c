@@ -17,78 +17,91 @@ DEFINE_PER_CPU(vcpu_t *, curr_vcpu);
 #define VM_OP_STATUS_FAIL_INVALID   29
 #define VM_OP_STATUS_UNKNOWN_STATE  30
 
-/**
- * TODO: completely refactor error handling.
- * 1. we can theoretically simply do a jbe
- * 2. always return a error code, and op related return values
- *  are returned via pointers passed as arguments
- */
-
 static inline int __check_vm_op_status(const uint32_t flags);
 
-#define check_vm_op_status() ({                             \
+#define query_vm_op_status() ({                             \
         uint64_t eflags;                                    \
         asm volatile ("pushfq; pop %0" : "=r"(eflags));     \
         __check_vm_op_status(eflags);                       \
         })
 
-static inline bool
-vmclear(const phys_addr_t vmcs_area_ptr)
+static inline int
+vmxon(const phys_addr_t vmxon_region)
 {
-    int res;
-
-    asm volatile("vmclear %0" :: "m"(vmcs_area_ptr) : "memory");
-
-    res = check_vm_op_status();
-    if (res !=  VM_OP_STATUS_SUCCESS) {
-        pr_warn("vmclear failed: %lu", res);
-        return false;
-    }
-
-    return true;
+    asm volatile("vmxon %0" :: "m"(vmxon_region) : "memory");
+    return query_vm_op_status();
 }
 
-static inline phys_addr_t
-vmptrst(void)
+static inline int
+vmxoff(void)
 {
-    phys_addr_t current_vmcs_addr;
-    asm volatile("vmptrst %0" : "+m"(current_vmcs_addr) :: "memory");
-    return current_vmcs_addr;
+    asm volatile("vmxoff");
+    return query_vm_op_status();
+}
+
+static inline int
+vmclear(const phys_addr_t vmcs_area_ptr)
+{
+    asm volatile("vmclear %0" :: "m"(vmcs_area_ptr) : "memory");
+    return query_vm_op_status();
+}
+
+static inline int
+vmptrst(phys_addr_t *vmcs_addr_ptr)
+{
+    asm volatile("vmptrst %0" : "=m"(*vmcs_addr_ptr) :: "memory");
+    return query_vm_op_status();
 }
 
 static inline int
 vmptrld(const phys_addr_t vmcs_ptr)
 {
     asm volatile("vmptrld %0" :: "m"(vmcs_ptr) : "memory");
-    return check_vm_op_status();
+    return query_vm_op_status();
 }
 
-static inline uint64_t
-vmread(const enum vmcs_field_encoding encoding)
+/* In 64-bit mode, the destionation operand size is always 64 bit */
+static inline int
+vmread(const enum vmcs_field_encoding encoding, uint64_t *val)
 {
     int res;
-    /* In 64-bit mode, the destionation operand size is always 64 bit */
-    uint64_t val;
-    asm volatile("vmread %1, %0" : "=rm"(val) : "r"(encoding) : "memory");
+    asm volatile("vmread %1, %0" : "=m"(*val) : "r"(encoding) : "memory");
+    res = query_vm_op_status();
 
-    res = check_vm_op_status();
     if (res != VM_OP_STATUS_SUCCESS) {
         pr_warn("'vmread' failed: %lu", res);
     }
 
-    return val;
+    return res;
 }
 
-static inline void
+static inline int
 vmwrite(const enum vmcs_field_encoding encoding, const uint64_t value)
 {
+    int res;
     asm volatile("vmwrite %0, %1" :: "m"(value), "r"(encoding) : "memory");
+    res = query_vm_op_status();
+
+    if (res != VM_OP_STATUS_SUCCESS) {
+        pr_warn("'vmwrite' failed: %lu", res);
+    }
+
+    return res;
 }
 
 static inline bool
 has_current_vmcs(void)
 {
-    return vmptrst() != NO_CURRENT_VMCS_ADDR;
+    int res;
+    phys_addr_t curr_vmcs_ptr;
+
+    res = vmptrst(&curr_vmcs_ptr);
+    if (res != VM_OP_STATUS_SUCCESS) {
+        pr_warn("'has_current_vmcs()' failed to get current vmcs ptr: %lu", res);
+        return false;
+    }
+
+    return curr_vmcs_ptr != NO_CURRENT_VMCS_ADDR;
 }
 
 static inline bool
@@ -138,7 +151,9 @@ __check_vm_op_status(const uint32_t flags)
     }
 
     if (__is_vm_fail_valid(flags)) {
-        return vmread(VM_INSTRUCTION_ERROR);
+        uint64_t error_number;
+        vmread(VM_INSTRUCTION_ERROR, &error_number);
+        return error_number;
     }
 
     return VM_OP_STATUS_UNKNOWN_STATE;
@@ -206,9 +221,9 @@ create_vmcs_area(void)
     const phys_addr_t vmcs_area_ptr = virt_to_phys(vaddr);
     tag_region_with_vmx_revisionid(vmcs_area_ptr);
 
-    if (!vmclear(vmcs_area_ptr)) {
+    if (vmclear(vmcs_area_ptr) != VM_OP_STATUS_SUCCESS) {
         free_page_raw(vmcs_area_ptr);
-        pr_error("'vmclear' operation failed!");
+        pr_error("Failed to execute 'vmclear' on new vmcs area");
         return 0;
     }
 
@@ -228,19 +243,9 @@ enter_vmx_operation(void)
         return false;
     }
 
-    uint64_t eflags;
-    asm volatile(
-            "vmxon %1   \n\t"
-            "pushfq     \n\t"
-            "pop %0"
-            : "=r"(eflags)
-            : "m"(vmxon_region)
-            : "memory"
-    );
-
-    if (!__is_vm_succeed(eflags)) {
+    if (vmxon(vmxon_region) != VM_OP_STATUS_SUCCESS) {
         free_page_raw(vmxon_region);
-        pr_error("Failed to enter VMXON operation");
+        pr_error("Failed to enter VMX operation");
         return false;
     }
 
@@ -255,13 +260,15 @@ leave_vmx_operation(void)
 {
     logical_processor_t *current = get_current_logical_processor();
     if (!current->vmx_operation_active) {
+        pr_warn("Logical processor is not in VMX operation");
         return;
     }
 
-    asm volatile("vmxoff");
+    vmxoff();
 
     current->vmx_operation_active = false;
     free_page_raw(current->vmxon_region_ptr);
+    current->vmxon_region_ptr = 0;
     pr_info("Left VMX operation");
 }
 
