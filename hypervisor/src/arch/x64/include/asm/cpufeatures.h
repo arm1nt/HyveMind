@@ -3,6 +3,10 @@
 
 #include "types.h"
 
+/******************************************************************************
+ * CPUID related constants
+******************************************************************************/
+
 #define CPUID_RANGE_BASE_VAL                    0x00
 #define CPUID_EXT_RANGE_BASE_VAL                0x80000000
 
@@ -25,6 +29,10 @@
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
 
+/******************************************************************************
+ * EFLAGS related constants
+******************************************************************************/
+
 #define EFLAGS_CF_BIT                           0 /* carry flag */
 #define EFLAGS_CF                               U64_LSHIFT(1, EFLAGS_CF_BIT)
 #define EFLAGS_PF_BIT                           2 /* parity flag */
@@ -42,15 +50,24 @@
 #define EFLAGS_ID_BIT                           21 /* Identification bit */
 #define EFLAGS_ID                               U64_LSHIFT(1, EFLAGS_ID_BIT)
 
-/* Relevant control registers */
+/******************************************************************************
+ * Control register related constants
+******************************************************************************/
+
 #define CR0_PE_BIT                              0 /* Enables protected mode */
 #define CR0_PE                                  U64_LSHIFT(1, CR0_PE_BIT)
 
 #define CR4_VMXE_BIT                            13 /* Enable VMX */
 #define CR4_VMXE                                U64_LSHIFT(1, CR4_VMXE_BIT)
 
-/* Relevant model specific registers and fields */
-#define MSRX64_IA32_EFER                    0xC0000080
+/******************************************************************************
+ * General MSR related constants
+******************************************************************************/
+
+enum general_msr {
+    MSRX64_IA32_EFER                = 0xC0000080,
+    MSRX64_IA32_FEATURE_CONTROL_MSR = 0x3A,
+};
 
 #define IA32_EFER_LME_BIT                   8 /* IA-32e mode enabled */
 #define IA32_EFER_LME                       U64_LSHIFT(1, IA32_EFER_LME_BIT)
@@ -65,8 +82,6 @@
 
 #define MSR_X2APIC_LAPIC_ID_REGISTER        0x802
 
-#define MSRX64_IA32_FEATURE_CONTROL_MSR     0x3A
-
 #define MSRX64_FTR_CTRL_LOCK_BIT            0
 #define MSRX64_FTR_CTRL_LOCKED              (U64_LSHIFT(1, MSRX64_FTR_CTRL_LOCK_BIT))
 #define MSRX64_FTR_CTRL_VMX_IN_SMX_BIT      1
@@ -74,21 +89,43 @@
 #define MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX_BIT 2
 #define MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX     (U64_LSHIFT(1, MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX_BIT))
 
-#define MSRX64_IA32_VMX_BASIC               0x480
-#define MSRX64_IA32_VMX_MISC                0x485
-#define MSRX64_IA32_VMX_CR0_FIXED0          0x486
-#define MSRX64_IA32_VMX_CR0_FIXED1          0x487
-#define MSRX64_IA32_VMX_CR4_FIXED0          0x488
-#define MSRX64_IA32_VMX_CR4_FIXED1          0x489
-#define MSRX64_IA32_VMX_VMCS_ENUM           0x48A
-#define MSRX64_IA32_VMX_EPT_VPID_CAP        0x48C
-#define MSRX64_IA32_VMX_VMFUNC              0x491
+/******************************************************************************
+ * VMX MSR related constants
+******************************************************************************/
+
+enum vmx_msr {
+    MSRX64_IA32_VMX_BASIC               = 0x480,
+    MSRX64_IA32_VMX_MISC                = 0x485,
+
+    MSRX64_IA32_VMX_CR0_FIXED0          = 0x486,
+    MSRX64_IA32_VMX_CR0_FIXED1          = 0x487,
+    MSRX64_IA32_VMX_CR4_FIXED0          = 0x488,
+    MSRX64_IA32_VMX_CR4_FIXED1          = 0x489,
+
+    MSRX64_IA32_VMX_VMCS_ENUM           = 0x48A,
+    MSRX64_IA32_VMX_EPT_VPID_CAP        = 0x48C,
+    MSRX64_IA32_VMX_VMFUNC              = 0x491,
+
+    MSR_IA32_VMX_PINBASED_CTLS          = 0x481,
+    /* MSR exists only if bit 55 in IA32_VMX_BASIC is 1 */
+    MSR_IA32_VMX_TRUE_PINBASED_CTLS     = 0x48D,
+    MSR_IA32_VMX_PROCBASED_CTLS         = 0x482,
+    /* MSR exists only if bit 55 in IA32_VMX_BASIC is 1 */
+    MSR_IA32_VMX_TRUE_PROCBASED_CTLS    = 0x48E,
+    /* MSR exists only if bit 63 in IA32_VMX_PROCBASED_CTLS is 1 */
+    MSR_IA32_VMX_PROCBASED_CTLS2        = 0x48B,
+    /* MSR exists only if bit 49 in IA32_VMX_PROCBASED_CTLS is 1 */
+    MSR_IA32_VMX_PROCBASED_CTLS3        = 0x492,
+};
 
 #define VMX_BASIC_REV_ID_LEN        31
 #define VMX_BASIC_REV_ID_MASK       U64_X_LSBS_SET(VMX_BASIC_REV_ID_LEN)
 
-#define VMX_BASIC_ADDR_WIDTH_BIT    48
-#define VMX_BASIC_ADDR_WIDTH        U64_LSHIFT(1, VMX_BASIC_ADDR_WIDTH_BIT)
+#define VMX_BASIC_ADDR_WIDTH_BIT        48
+#define VMX_BASIC_ADDR_WIDTH            U64_LSHIFT(1, VMX_BASIC_ADDR_WIDTH_BIT)
+/* Indicates whether any default1 values may be 0. (Appendix A.2) */
+#define VMX_BASIC_DEFAULT1_NULLABLE_BIT 55
+#define VMX_BASIC_DEFAULT1_NULLABLE     U64_LSHIFT(1, VMX_BASIC_DEFAULT1_NULLABLE_BIT)
 
 #endif /* _HYVEMIND_X64_ASM_CPUFEATURES_H */
 
