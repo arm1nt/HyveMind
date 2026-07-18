@@ -1,6 +1,9 @@
 #ifndef _HYVEMIND_HYVSTDLIB_H
 #define _HYVEMIND_HYVSTDLIB_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #define MAX(x,y) (((x) < (y)) ? (y) : (x))
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
