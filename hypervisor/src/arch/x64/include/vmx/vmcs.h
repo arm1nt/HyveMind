@@ -84,6 +84,21 @@ union guest_state_access_rights {
              reserved1: 15;
 };
 
+#define PIN_BASED_CTL_ACTIVATE      1
+#define PIN_BASED_CTL_DEACTIVATE    0
+
+union vmcs_pin_based_ctls_vector {
+    uint32_t raw;
+    uint32_t external_interrupt_handling    : 1,
+             reserved0                      : 2,
+             nmi_exiting                    : 1,
+             reserved1                      : 1,
+             virtual_nmis                   : 1,
+             activate_vmx_preemption_timer  : 1,
+             process_posted_interrupts      : 1,
+             reserved2                      : 24;
+};
+
 enum vmcs_field_encoding: uint64_t {
     /* 16 bit fields */
     VIRTUAL_PROCESSOR_ID                    = 0x00000000,
@@ -222,7 +237,7 @@ enum vmcs_field_encoding: uint64_t {
     HOST_RSP                                = 0x00006c14,
     HOST_RIP                                = 0x00006c16,
 };
-typedef uint32_t vmcs_field_encoding_t;
+typedef uint64_t vmcs_field_encoding_t;
 
 void vmcs_write_field(const vmcs_field_encoding_t encoding, const uint64_t value);
 #define vmcs_write_16bit_field(encoding, value) vmcs_write_field(encoding, value)
