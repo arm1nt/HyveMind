@@ -116,16 +116,28 @@ enum vmx_msr {
     MSR_IA32_VMX_PROCBASED_CTLS2        = 0x48B,
     /* MSR exists only if bit 49 in IA32_VMX_PROCBASED_CTLS is 1 */
     MSR_IA32_VMX_PROCBASED_CTLS3        = 0x492,
+
+    MSR_IA32_VMX_EXIT_CTLS              = 0x483,
+    /* MSR exists only if bit 55 in IA32_VMX_BASIC is 1 */
+    MSR_IA32_VMX_TRUE_EXIT_CTLS         = 0x48F,
+    MSR_IA32_VMX_EXIT_CTLS2             = 0x493,
+
+    MSR_IA32_VMX_ENTRY_CTLS             = 0x484,
+    /* MSR exists only if bit 55 in IA32_VMX_BASIC is 1 */
+    MSR_IA32_VMX_TRUE_ENTRY_CTLS        = 0x490,
 };
 
-#define VMX_BASIC_REV_ID_LEN        31
-#define VMX_BASIC_REV_ID_MASK       U64_X_LSBS_SET(VMX_BASIC_REV_ID_LEN)
+enum vmx_basic_msr_bit_pos {
+    VMX_BASIC_ADDR_WIDTH_BIT        = 48,
+    VMX_BASIC_DEFAULT1_MAY_BE_0_BIT = 55,
+};
 
-#define VMX_BASIC_ADDR_WIDTH_BIT        48
-#define VMX_BASIC_ADDR_WIDTH            U64_LSHIFT(1, VMX_BASIC_ADDR_WIDTH_BIT)
-/* Indicates whether any default1 values may be 0. (Appendix A.2) */
-#define VMX_BASIC_DEFAULT1_NULLABLE_BIT 55
-#define VMX_BASIC_DEFAULT1_NULLABLE     U64_LSHIFT(1, VMX_BASIC_DEFAULT1_NULLABLE_BIT)
+#define VMX_BASIC_ADDR_WIDTH        U64_LSHIFT(1, VMX_BASIC_ADDR_WIDTH_BIT)
+/* Indicates whether any default1 values may be 0 (Appendix A.2) */
+#define VMX_BASIC_DEFAULT1_MAY_BE_0 U64_LSHIFT(1, VMX_BASIC_DEFAULT1_MAY_BE_0_BIT)
+
+//#define VMX_BASIC_REV_ID_LEN        31
+//#define VMX_BASIC_REV_ID_MASK       U64_X_LSBS_SET(VMX_BASIC_REV_ID_LEN)
 
 #endif /* _HYVEMIND_X64_ASM_CPUFEATURES_H */
 

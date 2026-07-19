@@ -75,6 +75,20 @@ union guest_state_access_rights {
              reserved1: 15;
 };
 
+union vmcs_exit_reason {
+    uint32_t raw;
+    uint32_t basic_exit_reason              : 16,
+             zero0                          : 1,
+             undefined0                     : 8,
+             shadow_stack_prematurely_busy  : 1,
+             bus_lock_asserted              : 1,
+             enclave_mode                   : 1,
+             pending_mtf_vm_exit            : 1,
+             exit_from_vmx_root             : 1,
+             undefined1                     : 1,
+             vm_entry_failure               : 1;
+};
+
 #define PIN_BASED_CTL_ACTIVATE      1
 #define PIN_BASED_CTL_DEACTIVATE    0
 
@@ -208,6 +222,31 @@ union vmcs_secondary_vm_exit_ctls_vector {
              load_ia32_spec_ctrl            : 1,
              prematurely_busy_shadow_stack  : 1,
              reserved0                      : 60;
+};
+
+union vmcs_vm_entry_ctls_vector {
+    uint32_t raw;
+    uint32_t reserved0                          : 2,
+             load_debug_controls                : 1,
+             reserved1                          : 6,
+             ia32e_mode_guest                   : 1,
+             entry_to_smm                       : 1,
+             deactivate_dual_monitor_treatment  : 1,
+             reserved2                          : 1,
+             load_ia32_perf_global_ctrl         : 1,
+             load_ia32_pat                      : 1,
+             load_ia32_efer                     : 1,
+             load_ia32_bndcfgs                  : 1,
+             conceal_vmx_from_pt                : 1,
+             load_ia32_rtit_ctl                 : 1,
+             load_uinv                          : 1,
+             load_cet_state                     : 1,
+             load_guest_ia32_lbr_ctl            : 1,
+             load_pkrs                          : 1,
+             load_fred                          : 1,
+             load_ia32_spec_ctrl                : 1,
+             allow_seam_guest_telemetry         : 1,
+             reserved3                          : 6;
 };
 
 struct vmcs_component_encoding {
