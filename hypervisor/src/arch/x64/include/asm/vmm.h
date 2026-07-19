@@ -21,10 +21,15 @@ struct logical_processor {
     cpuid_t processor_id;
     lapicid_t lapic_id;
     bool is_bsp;
+
     processor_state_t state;
+
+    void *current_vcpu;
 
     uint64_t raw_cr3;
     void *stack_ptr;
+    /* todo: remove this field, we can just recompute it */
+    virt_addr_t tss_base_addr;
 
     phys_addr_t vmxon_region_ptr;
     bool vmx_operation_active;
@@ -49,6 +54,10 @@ get_current_logical_processor(void)
 {
     return (logical_processor_t*) percpu_ptr(logical_processor);
 }
+
+/**
+ * todo: create a list that stores all vms that we maintain
+ */
 
 #endif /* _HYVEMIND_X64_ASM_VMM_H */
 
