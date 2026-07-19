@@ -3,14 +3,6 @@
 
 #include "hyvstdlib.h"
 
-#define NO_CURRENT_VMCS_ADDR 0xFFFFFFFFFFFFFFFF
-
-enum vmcs_launch_state {
-    VMCS_LS_INVALID,
-    VMCS_LS_CLEAR,
-    VMCS_LS_LAUNCHED,
-};
-
 struct vmcs_hdr {
     uint32_t revision_id: 31,
              shadow_vmcs: 1;
@@ -22,13 +14,12 @@ struct vmcs {
     uint8_t data[];
 };
 
-struct vmcs_component_encoding {
-    uint32_t access_type    : 1,
-             index          : 9,
-             type           : 2,
-             reserved0      : 1,
-             width          : 2,
-             reserved1      : 17;
+#define NO_CURRENT_VMCS_ADDR 0xFFFFFFFFFFFFFFFF
+
+enum vmcs_launch_state {
+    VMCS_LS_INVALID,
+    VMCS_LS_CLEAR,
+    VMCS_LS_LAUNCHED,
 };
 
 #define VM_INS_ERROR_MIN_VALUE 1
@@ -181,6 +172,51 @@ union vmcs_tertiary_processor_based_ctls_vector {
              reserved0                      : 2,
              pebs_uses_guest_paddrs         : 1,
              reserved1                      : 51;
+};
+
+union vmcs_primary_vm_exit_ctls_vector {
+    uint32_t raw;
+    uint32_t reserved0                          : 2,
+             save_debug_ctrls                   : 1,
+             reserved1                          : 6,
+             host_addr_space_size               : 1,
+             reserved2                          : 2,
+             load_ia32_perf_global_ctrl         : 1,
+             reserved3                          : 2,
+             ack_interrupt_on_exit              : 1,
+             reserved4                          : 2,
+             save_ia32_pat                      : 1,
+             load_ia32_pat                      : 1,
+             save_ia32_efer                     : 1,
+             load_ia32_efer                     : 1,
+             save_vmx_preemption_timer_value    : 1,
+             clear_ia32_bndcfgs                 : 1,
+             conceal_vmx_from_pt                : 1,
+             clear_ia32_rtit_ctl                : 1,
+             clear_ia32_lbr_ctl                 : 1,
+             clear_uinv                         : 1,
+             load_cet_state                     : 1,
+             load_pkrs                          : 1,
+             save_ia32_pef_global_ctl           : 1,
+             activate_secondary_controls        : 1;
+};
+
+union vmcs_secondary_vm_exit_ctls_vector {
+    uint64_t raw;
+    uint64_t save_fred                      : 1,
+             load_fred                      : 1,
+             load_ia32_spec_ctrl            : 1,
+             prematurely_busy_shadow_stack  : 1,
+             reserved0                      : 60;
+};
+
+struct vmcs_component_encoding {
+    uint32_t access_type    : 1,
+             index          : 9,
+             type           : 2,
+             reserved0      : 1,
+             width          : 2,
+             reserved1      : 17;
 };
 
 enum vmcs_field_encoding: uint64_t {
