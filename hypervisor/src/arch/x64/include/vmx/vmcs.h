@@ -62,31 +62,35 @@ is_valid_vm_ins_error(const int val)
 
 union guest_state_access_rights {
     uint32_t raw;
-    uint32_t segment_type: 4,
-             descriptor_type: 1,
-             dpl: 2,
-             present: 1,
-             reserved0: 4,
-             avl: 1,
-             l: 1,
-             db: 1,
-             g: 1,
-             segment_usable: 1,
-             reserved1: 15;
+    struct {
+        uint32_t segment_type: 4,
+                 descriptor_type: 1,
+                 dpl: 2,
+                 present: 1,
+                 reserved0: 4,
+                 avl: 1,
+                 l: 1,
+                 db: 1,
+                 g: 1,
+                 segment_usable: 1,
+                 reserved1: 15;
+    };
 };
 
 union vmcs_exit_reason {
     uint32_t raw;
-    uint32_t basic_exit_reason              : 16,
-             zero0                          : 1,
-             undefined0                     : 8,
-             shadow_stack_prematurely_busy  : 1,
-             bus_lock_asserted              : 1,
-             enclave_mode                   : 1,
-             pending_mtf_vm_exit            : 1,
-             exit_from_vmx_root             : 1,
-             undefined1                     : 1,
-             vm_entry_failure               : 1;
+    struct {
+        uint32_t basic_exit_reason              : 16,
+                 zero0                          : 1,
+                 undefined0                     : 8,
+                 shadow_stack_prematurely_busy  : 1,
+                 bus_lock_asserted              : 1,
+                 enclave_mode                   : 1,
+                 pending_mtf_vm_exit            : 1,
+                 exit_from_vmx_root             : 1,
+                 undefined1                     : 1,
+                 vm_entry_failure               : 1;
+    };
 };
 
 #define PIN_BASED_CTL_ACTIVATE      1
@@ -94,159 +98,173 @@ union vmcs_exit_reason {
 
 union vmcs_pin_based_ctls_vector {
     uint32_t raw;
-    uint32_t external_interrupt_handling    : 1,
-             reserved0                      : 2,
-             nmi_exiting                    : 1,
-             reserved1                      : 1,
-             virtual_nmis                   : 1,
-             activate_vmx_preemption_timer  : 1,
-             process_posted_interrupts      : 1,
-             reserved2                      : 24;
+    struct {
+        uint32_t external_interrupt_handling    : 1,
+                 reserved0                      : 2,
+                 nmi_exiting                    : 1,
+                 reserved1                      : 1,
+                 virtual_nmis                   : 1,
+                 activate_vmx_preemption_timer  : 1,
+                 process_posted_interrupts      : 1,
+                 reserved2                      : 24;
+    };
 };
 
 union vmcs_primary_processor_based_ctls_vector {
     uint32_t raw;
-    uint32_t reserved0                      : 2,
-             interrupt_window_exiting       : 1,
-             tsc_offsetting                 : 1,
-             reserved1                      : 3,
-             hlt_exiting                    : 1,
-             reserved2                      : 1,
-             invlpg_exiting                 : 1,
-             mwait_exiting                  : 1,
-             rdpmc_exiting                  : 1,
-             rdtsc_exiting                  : 1,
-             reserved3                      : 2,
-             cr3_load_exiting               : 1,
-             cr3_store_exiting              : 1,
-             activate_tertiary_controls     : 1,
-             reserved4                      : 1,
-             cr8_load_exiting               : 1,
-             cr8_store_exiting              : 1,
-             tpr_shadow                     : 1,
-             nmi_window_exiting             : 1,
-             mov_dr_exiting                 : 1,
-             unconditional_io_exiting       : 1,
-             io_bitmaps                     : 1,
-             reserved5                      : 1,
-             monitor_trap_flag              : 1,
-             msr_bitmaps                    : 1,
-             monitor_exiting                : 1,
-             pause_exiting                  : 1,
-             activate_secondary_controls    : 1;
+    struct {
+        uint32_t reserved0                      : 2,
+                 interrupt_window_exiting       : 1,
+                 tsc_offsetting                 : 1,
+                 reserved1                      : 3,
+                 hlt_exiting                    : 1,
+                 reserved2                      : 1,
+                 invlpg_exiting                 : 1,
+                 mwait_exiting                  : 1,
+                 rdpmc_exiting                  : 1,
+                 rdtsc_exiting                  : 1,
+                 reserved3                      : 2,
+                 cr3_load_exiting               : 1,
+                 cr3_store_exiting              : 1,
+                 activate_tertiary_controls     : 1,
+                 reserved4                      : 1,
+                 cr8_load_exiting               : 1,
+                 cr8_store_exiting              : 1,
+                 tpr_shadow                     : 1,
+                 nmi_window_exiting             : 1,
+                 mov_dr_exiting                 : 1,
+                 unconditional_io_exiting       : 1,
+                 io_bitmaps                     : 1,
+                 reserved5                      : 1,
+                 monitor_trap_flag              : 1,
+                 msr_bitmaps                    : 1,
+                 monitor_exiting                : 1,
+                 pause_exiting                  : 1,
+                 activate_secondary_controls    : 1;
+    };
 };
 
 union vmcs_secondary_processor_based_ctls_vector {
     uint32_t raw;
-    uint32_t virtualize_apic_addresses          : 1,
-             enable_ept                         : 1,
-             descriptor_table_exiting           : 1,
-             enable_rdtscp                      : 1,
-             virtualize_x2apic_mode             : 1,
-             enable_vpid                        : 1,
-             wbinvd_exiting                     : 1,
-             unrestricted_guest                 : 1,
-             apic_register_virtualization       : 1,
-             virtual_interrupt_delivery         : 1,
-             pause_loop_exiting                 : 1,
-             rdrand_exiting                     : 1,
-             enable_invpcid                     : 1,
-             enable_vm_functions                : 1,
-             vmcs_shadowing                     : 1,
-             enable_encls_exiting               : 1,
-             rdseed_exiting                     : 1,
-             enable_pml                         : 1,
-             ept_violation                      : 1,
-             conceal_vmx_from_pt                : 1,
-             enable_xsaves_xrstors              : 1,
-             pasid_translation                  : 1,
-             mode_base_execute_ctrl_for_ept     : 1,
-             sub_page_write_permissions_for_ept : 1,
-             intel_pt_uses_guest_paddrs         : 1,
-             use_tsc_scaling                    : 1,
-             enable_user_wait_pause             : 1,
-             enable_pconfig                     : 1,
-             reserved0                          : 2,
-             vmm_bus_lock_detection             : 1,
-             instruction_timeout                : 1;
+    struct {
+        uint32_t virtualize_apic_addresses          : 1,
+                 enable_ept                         : 1,
+                 descriptor_table_exiting           : 1,
+                 enable_rdtscp                      : 1,
+                 virtualize_x2apic_mode             : 1,
+                 enable_vpid                        : 1,
+                 wbinvd_exiting                     : 1,
+                 unrestricted_guest                 : 1,
+                 apic_register_virtualization       : 1,
+                 virtual_interrupt_delivery         : 1,
+                 pause_loop_exiting                 : 1,
+                 rdrand_exiting                     : 1,
+                 enable_invpcid                     : 1,
+                 enable_vm_functions                : 1,
+                 vmcs_shadowing                     : 1,
+                 enable_encls_exiting               : 1,
+                 rdseed_exiting                     : 1,
+                 enable_pml                         : 1,
+                 ept_violation                      : 1,
+                 conceal_vmx_from_pt                : 1,
+                 enable_xsaves_xrstors              : 1,
+                 pasid_translation                  : 1,
+                 mode_base_execute_ctrl_for_ept     : 1,
+                 sub_page_write_permissions_for_ept : 1,
+                 intel_pt_uses_guest_paddrs         : 1,
+                 use_tsc_scaling                    : 1,
+                 enable_user_wait_pause             : 1,
+                 enable_pconfig                     : 1,
+                 reserved0                          : 2,
+                 vmm_bus_lock_detection             : 1,
+                 instruction_timeout                : 1;
+    };
 };
 
 union vmcs_tertiary_processor_based_ctls_vector {
     uint64_t raw;
-    uint64_t loadiwkey_exiting              : 1,
-             enable_hlat                    : 1,
-             ept_paging_write_control       : 1,
-             guest_paging_verification      : 1,
-             ipi_virtualization             : 1,
-             seam_guest_paddr_width         : 1,
-             enable_msr_list_instructions   : 1,
-             virtualize_ia32_spec_ctrl      : 1,
-             apic_timer_virtualization      : 1,
-             enable_pbndkb                  : 1,
-             reserved0                      : 2,
-             pebs_uses_guest_paddrs         : 1,
-             reserved1                      : 51;
+    struct {
+        uint64_t loadiwkey_exiting              : 1,
+                 enable_hlat                    : 1,
+                 ept_paging_write_control       : 1,
+                 guest_paging_verification      : 1,
+                 ipi_virtualization             : 1,
+                 seam_guest_paddr_width         : 1,
+                 enable_msr_list_instructions   : 1,
+                 virtualize_ia32_spec_ctrl      : 1,
+                 apic_timer_virtualization      : 1,
+                 enable_pbndkb                  : 1,
+                 reserved0                      : 2,
+                 pebs_uses_guest_paddrs         : 1,
+                 reserved1                      : 51;
+    };
 };
 
 union vmcs_primary_vm_exit_ctls_vector {
     uint32_t raw;
-    uint32_t reserved0                          : 2,
-             save_debug_ctrls                   : 1,
-             reserved1                          : 6,
-             host_addr_space_size               : 1,
-             reserved2                          : 2,
-             load_ia32_perf_global_ctrl         : 1,
-             reserved3                          : 2,
-             ack_interrupt_on_exit              : 1,
-             reserved4                          : 2,
-             save_ia32_pat                      : 1,
-             load_ia32_pat                      : 1,
-             save_ia32_efer                     : 1,
-             load_ia32_efer                     : 1,
-             save_vmx_preemption_timer_value    : 1,
-             clear_ia32_bndcfgs                 : 1,
-             conceal_vmx_from_pt                : 1,
-             clear_ia32_rtit_ctl                : 1,
-             clear_ia32_lbr_ctl                 : 1,
-             clear_uinv                         : 1,
-             load_cet_state                     : 1,
-             load_pkrs                          : 1,
-             save_ia32_pef_global_ctl           : 1,
-             activate_secondary_controls        : 1;
+    struct {
+        uint32_t reserved0                          : 2,
+                 save_debug_ctrls                   : 1,
+                 reserved1                          : 6,
+                 host_addr_space_size               : 1,
+                 reserved2                          : 2,
+                 load_ia32_perf_global_ctrl         : 1,
+                 reserved3                          : 2,
+                 ack_interrupt_on_exit              : 1,
+                 reserved4                          : 2,
+                 save_ia32_pat                      : 1,
+                 load_ia32_pat                      : 1,
+                 save_ia32_efer                     : 1,
+                 load_ia32_efer                     : 1,
+                 save_vmx_preemption_timer_value    : 1,
+                 clear_ia32_bndcfgs                 : 1,
+                 conceal_vmx_from_pt                : 1,
+                 clear_ia32_rtit_ctl                : 1,
+                 clear_ia32_lbr_ctl                 : 1,
+                 clear_uinv                         : 1,
+                 load_cet_state                     : 1,
+                 load_pkrs                          : 1,
+                 save_ia32_pef_global_ctl           : 1,
+                 activate_secondary_controls        : 1;
+    };
 };
 
 union vmcs_secondary_vm_exit_ctls_vector {
     uint64_t raw;
-    uint64_t save_fred                      : 1,
-             load_fred                      : 1,
-             load_ia32_spec_ctrl            : 1,
-             prematurely_busy_shadow_stack  : 1,
-             reserved0                      : 60;
+    struct {
+        uint64_t save_fred                      : 1,
+                 load_fred                      : 1,
+                 load_ia32_spec_ctrl            : 1,
+                 prematurely_busy_shadow_stack  : 1,
+                 reserved0                      : 60;
+    };
 };
 
 union vmcs_vm_entry_ctls_vector {
     uint32_t raw;
-    uint32_t reserved0                          : 2,
-             load_debug_controls                : 1,
-             reserved1                          : 6,
-             ia32e_mode_guest                   : 1,
-             entry_to_smm                       : 1,
-             deactivate_dual_monitor_treatment  : 1,
-             reserved2                          : 1,
-             load_ia32_perf_global_ctrl         : 1,
-             load_ia32_pat                      : 1,
-             load_ia32_efer                     : 1,
-             load_ia32_bndcfgs                  : 1,
-             conceal_vmx_from_pt                : 1,
-             load_ia32_rtit_ctl                 : 1,
-             load_uinv                          : 1,
-             load_cet_state                     : 1,
-             load_guest_ia32_lbr_ctl            : 1,
-             load_pkrs                          : 1,
-             load_fred                          : 1,
-             load_ia32_spec_ctrl                : 1,
-             allow_seam_guest_telemetry         : 1,
-             reserved3                          : 6;
+    struct {
+        uint32_t reserved0                          : 2,
+                 load_debug_controls                : 1,
+                 reserved1                          : 6,
+                 ia32e_mode_guest                   : 1,
+                 entry_to_smm                       : 1,
+                 deactivate_dual_monitor_treatment  : 1,
+                 reserved2                          : 1,
+                 load_ia32_perf_global_ctrl         : 1,
+                 load_ia32_pat                      : 1,
+                 load_ia32_efer                     : 1,
+                 load_ia32_bndcfgs                  : 1,
+                 conceal_vmx_from_pt                : 1,
+                 load_ia32_rtit_ctl                 : 1,
+                 load_uinv                          : 1,
+                 load_cet_state                     : 1,
+                 load_guest_ia32_lbr_ctl            : 1,
+                 load_pkrs                          : 1,
+                 load_fred                          : 1,
+                 load_ia32_spec_ctrl                : 1,
+                 allow_seam_guest_telemetry         : 1,
+                 reserved3                          : 6;
+    };
 };
 
 struct vmcs_component_encoding {
