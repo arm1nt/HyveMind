@@ -27,6 +27,14 @@ reload_tr_register(const segment_selector_t *selector)
     asm volatile ("LTR %0" :: "m"(*selector));
 }
 
+segment_selector_t
+read_task_register(void)
+{
+    segment_selector_t tss_selector;
+    asm volatile("STR %0" : "=m"(tss_selector) :: "memory");
+    return tss_selector;
+}
+
 int
 init_default_tss(tss_t *tss, const unsigned int stack_size_pages)
 {

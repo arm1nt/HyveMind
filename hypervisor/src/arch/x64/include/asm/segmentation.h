@@ -111,6 +111,7 @@ struct segment_regs {
 void reload_segment_registers(const struct segment_regs *regs);
 
 void reload_tr_register(const segment_selector_t *selector);
+segment_selector_t read_task_register(void);
 
 segment_selector_t get_cs(void);
 
