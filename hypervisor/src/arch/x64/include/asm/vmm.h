@@ -28,8 +28,6 @@ struct logical_processor {
 
     uint64_t raw_cr3;
     void *stack_ptr;
-    /* todo: remove this field, we can just recompute it */
-    virt_addr_t tss_base_addr;
 
     phys_addr_t vmxon_region_ptr;
     bool vmx_operation_active;

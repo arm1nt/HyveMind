@@ -35,6 +35,16 @@ read_task_register(void)
     return tss_selector;
 }
 
+virt_addr_t
+get_base_from_tss_descriptor(const tss_descriptor_t *desc)
+{
+    virt_addr_t base = desc->base0;
+    base |= (U64_LSHIFT(desc->base1, 16));
+    base |= (U64_LSHIFT(desc->base2, 24));
+    base |= (U64_LSHIFT(desc->base3, 32));
+    return base;
+}
+
 int
 init_default_tss(tss_t *tss, const unsigned int stack_size_pages)
 {

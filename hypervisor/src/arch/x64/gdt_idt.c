@@ -1,8 +1,10 @@
+#include "fatal.h"
 #include "types.h"
-#include "mm_types.h"
 #include "string.h"
-#include "printf.h"
 #include "per-cpu.h"
+#include "pf_alloc.h"
+#include "printf.h"
+#include "asm/vmm.h"
 #include "asm/gdt_idt.h"
 #include "asm/idt.h"
 
@@ -155,17 +157,36 @@ init_new_gdt(void)
 int
 install_new_tss(void)
 {
+    virt_addr_t tss_page;
+    tss_t *tss_segment;
     struct gdt_struct *gdt = percpu_ptr(gdt_tables);
 
-    tss_t tss_segment;
-    if (init_default_tss(&tss_segment, TSS_IST_DEFAULT_SIZE_PAGES) != 0)  {
+    if (get_page_zeroed(&tss_page) != 0) {
+        pr_error("Failed to allocate page for the TSS");
+        return -1;
+    }
+
+    tss_segment = (tss_t *) tss_page;
+    if (init_default_tss(tss_segment, TSS_IST_DEFAULT_SIZE_PAGES) != 0)  {
         pr_error("Failed to create a new TSS segment");
         return -1;
     }
-    tss_descriptor_t tss_desc = create_tss_desc(&tss_segment, 0);
+    tss_descriptor_t tss_desc = create_tss_desc(tss_segment, 0);
 
     write_gdt_entry(gdt, &tss_desc, HYVEMIND_TSS_INDEX, SYSTEM_SEGMENT_DESC);
     return 0;
+}
+
+virt_addr_t
+get_current_tss_base(void)
+{
+    const gdt_ptr_t gdtr = read_gdtr();
+    struct gdt_struct *curr_gdt = (struct gdt_struct *) gdtr.base;
+
+    const segment_selector_t tr = read_task_register();
+    const tss_descriptor_t *tss_desc = (tss_descriptor_t *) &curr_gdt->gdt[tr.index];
+
+    return get_base_from_tss_descriptor(tss_desc);
 }
 
 void

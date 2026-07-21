@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_ASM_X64_GDT_IDT_H
 #define _HYVEMIND_ASM_X64_GDT_IDT_H
 
+#include "mm_types.h"
 #include "asm/paging.h"
 #include "asm/segmentation.h"
 
@@ -59,13 +60,14 @@ struct gdt_struct {
 #define GDT_NULL_SELECTOR GDT_SELECTOR(0, 0, 0)
 
 static segment_descriptor_t hyvemind_cs_segment_desc =
-    DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, CODE_EXECUTE_ONLY, 0, 1);
+    DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, CODE_EXECUTE_ONLY_ACCESSED, 0, 1);
 
 static segment_descriptor_t hyvemind_data_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, DATA_RW_EXPAND_DOWN, 0, 0);
 
-void init_new_gdt(void);
 int install_new_tss(void);
+virt_addr_t get_current_tss_base(void);
+void init_new_gdt(void);
 void load_gdt(void);
 gdt_ptr_t read_gdtr(void);
 
