@@ -14,7 +14,8 @@ struct vmcs {
     uint8_t data[];
 };
 
-#define NO_CURRENT_VMCS_ADDR 0xFFFFFFFFFFFFFFFF
+#define NO_CURRENT_VMCS_ADDR    0xFFFFFFFFFFFFFFFF
+#define NO_VMCS_LINK_PTR        0xFFFFFFFFFFFFFFFF
 
 enum vmcs_launch_state {
     VMCS_LS_INVALID,
@@ -72,7 +73,7 @@ union guest_state_access_rights {
                  l: 1,
                  db: 1,
                  g: 1,
-                 segment_usable: 1,
+                 segment_unusable: 1,
                  reserved1: 15;
     };
 };
@@ -265,6 +266,13 @@ union vmcs_vm_entry_ctls_vector {
                  allow_seam_guest_telemetry         : 1,
                  reserved3                          : 6;
     };
+};
+
+enum vmcs_guest_activity_state {
+    GUEST_ACTIVE,
+    GUEST_HLT,
+    GUEST_SHUTDOWN,
+    GUEST_WAIT_FOR_SIPI
 };
 
 struct vmcs_component_encoding {
