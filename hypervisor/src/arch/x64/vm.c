@@ -1,9 +1,9 @@
 #include "fatal.h"
 #include "halloc.h"
 #include "pf_alloc.h"
+#include "printf.h"
 #include "types.h"
 #include "vm.h"
-#include "printf.h"
 #include "asm/gdt_idt.h"
 #include "asm/mm.h"
 #include "asm/vm.h"
@@ -30,6 +30,25 @@ sanitize_cr0_register_for_vmx_operation(union cr0 *cr0)
 }
 
 static inline void
+sanitize_cr3_register_for_vmx_operation(struct cr3 *cr3)
+{
+    const uint64_t old_cr3_raw = *((uint64_t *) cr3);
+    cr3->ignored0 = 0;
+    cr3->ignored1 = 0;
+    cr3->reserved0 = 0;
+    cr3->reserved1 = 0;
+
+    cr3->paddr &= percpu_val(max_phys_addr);
+
+    if (old_cr3_raw != *((uint64_t *) cr3)) {
+        pr_info("CR3 sanitization changed cr3: old (%lx) vs. new (%lx)",
+                old_cr3_raw,
+                *((uint64_t *) cr3)
+        );
+    }
+}
+
+static inline void
 sanitize_cr4_register_for_vmx_operation(union cr4 *cr4)
 {
     const uint64_t old_cr4_raw = cr4->raw;
@@ -49,19 +68,260 @@ sanitize_cr4_register_for_vmx_operation(union cr4 *cr4)
  * Guest state area setup
 ******************************************************************************/
 
-/* todo: */
+extern void vm_entry_test(void);
+
+static inline void
+init_guest_cr0_register(vcpu_t *vcpu)
+{
+    union cr0 guest_cr0;
+    guest_cr0.raw = read_cr0();
+
+    guest_cr0.pg = 1;
+    guest_cr0.pe = 1;
+    guest_cr0.wp = 1;
+
+    sanitize_cr0_register_for_vmx_operation(&guest_cr0);
+    vmx_write_quadword(vcpu, GUEST_CR0, guest_cr0.raw);
+}
+
+static inline void
+init_guest_cr3_register(vcpu_t *vcpu)
+{
+    uint64_t raw_cr3 = read_cr3();
+    struct cr3 *guest_cr3 = (struct cr3 *) &raw_cr3;
+    sanitize_cr3_register_for_vmx_operation(guest_cr3);
+    vmx_write_quadword(vcpu, GUEST_CR3, raw_cr3);
+}
+
+static inline void
+init_guest_cr4_register(vcpu_t *vcpu)
+{
+    union cr4 guest_cr4;
+    guest_cr4.raw = read_cr4();
+
+    /* Must be 1 if 'IA32e mode guest' vm entry control is selected */
+    guest_cr4.pae = 1;
+
+    sanitize_cr4_register_for_vmx_operation(&guest_cr4);
+    vmx_write_quadword(vcpu, GUEST_CR4, guest_cr4.raw);
+}
+
+static inline void
+setup_guest_control_registers(vcpu_t *vcpu)
+{
+    init_guest_cr0_register(vcpu);
+    init_guest_cr3_register(vcpu);
+    init_guest_cr4_register(vcpu);
+}
+
+static inline void
+setup_guest_tr_selector(vcpu_t *vcpu)
+{
+    const segment_selector_t tr = read_task_register();
+    const uint16_t raw_tr = *((uint16_t *) &tr);
+
+    if (tr.ti != TI_GDT) {
+        die_reason("TR TI flag is not 0");
+    }
+
+    vmx_write_quadword(vcpu, GUEST_TR_SELECTOR, U64(raw_tr));
+}
+
+static inline void
+setup_guest_cs_selector(vcpu_t *vcpu)
+{
+    const segment_selector_t cs = DEFINE_SEGMENT_SELECTOR(HYVEMIND_CS_SEGMENT_INDEX, TI_GDT,0);
+    const uint16_t raw_cs = *((uint16_t *) &cs);
+
+    vmx_write_quadword(vcpu, HOST_CS_SELECTOR, U64(raw_cs));
+}
+
+static inline void
+setup_guest_selector_fields(vcpu_t *vcpu)
+{
+    setup_guest_tr_selector(vcpu);
+    setup_guest_cs_selector(vcpu);
+
+    vmx_write_quadword(vcpu, GUEST_SS_SELECTOR, 0);
+    vmx_write_quadword(vcpu, GUEST_DS_SELECTOR, 0);
+    vmx_write_quadword(vcpu, GUEST_ES_SELECTOR, 0);
+    vmx_write_quadword(vcpu, GUEST_FS_SELECTOR, 0);
+    vmx_write_quadword(vcpu, GUEST_GS_SELECTOR, 0);
+    vmx_write_quadword(vcpu, GUEST_LDTR_SELECTOR, 0);
+}
+
+static inline void
+setup_guest_base_address_and_limit_fields(vcpu_t *vcpu)
+{
+    const gdt_ptr_t gdtr = read_gdtr();
+    const idt_ptr_t idtr = read_idtr();
+    const virt_addr_t tr_base = get_current_tss_base();
+
+    if (!is_paging_canonical(gdtr.base)) {
+        pr_error("gdt base address is not canonical: %lx", gdtr.base);
+        die();
+    }
+
+    if (!is_paging_canonical(idtr.base)) {
+        pr_error("idt base address is not canonical: %lx", idtr.base);
+        die();
+    }
+
+    if (!is_paging_canonical(tr_base)) {
+        pr_error("TSS base address is not canonical: %lx", tr_base);
+        die();
+    }
+
+    vmx_write_quadword(vcpu, GUEST_GDTR_BASE, gdtr.base);
+    vmx_write_quadword(vcpu, GUEST_IDTR_BASE, idtr.base);
+    vmx_write_quadword(vcpu, GUEST_TR_BASE, tr_base);
+
+    vmx_write_quadword(vcpu, GUEST_GDTR_LIMIT, U64(gdtr.limit));
+    vmx_write_quadword(vcpu, GUEST_IDTR_LIMIT, U64(idtr.limit));
+    vmx_write_quadword(vcpu, GUEST_TR_LIMIT, U64(sizeof(tss_t) - 1));
+
+    /* prob. redundant */
+    vmx_write_quadword(vcpu, GUEST_CS_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_SS_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_DS_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_ES_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_FS_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_GS_BASE, 0);
+    vmx_write_quadword(vcpu, GUEST_LDTR_BASE, 0);
+
+    vmx_write_quadword(vcpu, GUEST_CS_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_SS_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_DS_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_ES_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_FS_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_GS_LIMIT, 0);
+    vmx_write_quadword(vcpu, GUEST_LDTR_LIMIT, 0);
+}
+
+static inline void
+setup_guest_cs_access_rights(vcpu_t *vcpu)
+{
+    union guest_state_access_rights cs_attrs;
+    cs_attrs.raw = 0;
+    cs_attrs.segment_type = CODE_EXECUTE_ONLY_ACCESSED;
+    cs_attrs.descriptor_type = CODE_DATA_SEGMENT_DESC;
+    cs_attrs.dpl = 0;
+    cs_attrs.present = SEGMENT_PRESENT;
+    cs_attrs.l = 1;
+    cs_attrs.db = 0;
+    cs_attrs.g = 0;
+    cs_attrs.segment_unusable = 0;
+
+    vmx_write_doubleword(vcpu, GUEST_CS_ACCESS_RIGHTS, cs_attrs.raw);
+}
+
+static inline void
+setup_guest_tr_access_rights(vcpu_t *vcpu)
+{
+    union guest_state_access_rights tr_attrs;
+    tr_attrs.raw = 0;
+    tr_attrs.segment_type = IA32E_TSS_BUSY;
+    tr_attrs.descriptor_type = SYSTEM_SEGMENT_DESC;
+    tr_attrs.dpl = 0;
+    tr_attrs.present = SEGMENT_PRESENT;
+    tr_attrs.g = 0;
+    tr_attrs.segment_unusable = 0;
+
+    vmx_write_doubleword(vcpu, GUEST_TR_ACCESS_RIGHTS, tr_attrs.raw);
+}
+
+static inline void
+setup_guest_access_rights_fields(vcpu_t *vcpu)
+{
+    setup_guest_cs_access_rights(vcpu);
+    setup_guest_tr_access_rights(vcpu);
+
+    union guest_state_access_rights unusable_segment_attrs;
+    unusable_segment_attrs.raw = 0;
+    unusable_segment_attrs.segment_unusable = 1;
+
+    vmx_write_doubleword(vcpu, GUEST_SS_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+    vmx_write_doubleword(vcpu, GUEST_DS_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+    vmx_write_doubleword(vcpu, GUEST_ES_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+    vmx_write_doubleword(vcpu, GUEST_FS_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+    vmx_write_doubleword(vcpu, GUEST_GS_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+    vmx_write_doubleword(vcpu, GUEST_LDTR_ACCESS_RIGHTS, unusable_segment_attrs.raw);
+}
+
+static inline void
+setup_guest_rip_field(vcpu_t *vcpu)
+{
+    /* Doesn't have to be canonical */
+    const virt_addr_t guest_entry_addr = (virt_addr_t) vm_entry_test;
+    vmx_write_quadword(vcpu, GUEST_RIP, guest_entry_addr);
+}
+
+static inline void
+setup_guest_rflags_field(vcpu_t *vcpu)
+{
+    rflags_t rflags;
+    rflags.raw = 0;
+    rflags.reserved0 = 1;
+    vmx_write_quadword(vcpu, GUEST_RFLAGS, rflags.raw);
+}
+
+static inline void
+setup_guest_stack(vcpu_t *vcpu)
+{
+    const int nr_guest_stack_pages = 10;
+    virt_addr_t stack_bot, guest_rsp_val;
+
+    if (get_pages_zeroed(nr_guest_stack_pages, &stack_bot) != 0) {
+        die_reason("Failed to allocate pages for guest stack");
+    }
+
+    if (!is_paging_canonical(stack_bot)) {
+        pr_error("Allocated guest 'stack_bot' value not canonical: %lx", stack_bot);
+        die();
+    }
+
+    guest_rsp_val = (stack_bot + (nr_guest_stack_pages * PAGE_SIZE)) - 8;
+    if (!is_paging_canonical(guest_rsp_val)) {
+        pr_error("Guest rsp value is not canonical: %lx", guest_rsp_val);
+        die();
+    }
+
+    vmx_write_quadword(vcpu, GUEST_RSP, guest_rsp_val);
+}
+
+static inline void
+setup_guest_non_register_state(vcpu_t *vcpu)
+{
+    vmx_write_quadword(vcpu, GUEST_ACTIVITY_STATE, GUEST_ACTIVE);
+    vmx_write_quadword(vcpu, GUEST_INTERRUPTIBILITY_STATE, 0);
+    vmx_write_quadword(vcpu, GUEST_PENDING_DEBUG_EXCEPTIONS, 0);
+    vmx_write_quadword(vcpu, VMCS_LINK_POINTER, NO_VMCS_LINK_PTR);
+}
+
+static inline void
+setup_guest_state(vcpu_t *vcpu)
+{
+    setup_guest_control_registers(vcpu);
+
+    vmx_write_quadword(vcpu, GUEST_IA32_SYSENTER_ESP, 0);
+    vmx_write_quadword(vcpu, GUEST_IA32_SYSENTER_EIP, 0);
+
+    setup_guest_selector_fields(vcpu);
+    setup_guest_base_address_and_limit_fields(vcpu);
+    setup_guest_access_rights_fields(vcpu);
+
+    setup_guest_rip_field(vcpu);
+    setup_guest_rflags_field(vcpu);
+    setup_guest_stack(vcpu);
+
+    setup_guest_non_register_state(vcpu);
+}
 
 /******************************************************************************
  * Host state area setup
 ******************************************************************************/
 
 extern void asm_vmx_exit_handler(void);
-
-void
-vmx_exit_handler(void)
-{
-    pr_info("vmx exit handler called");
-}
 
 static inline void
 set_host_cr0_register(vcpu_t *vcpu)
@@ -458,10 +718,11 @@ arch_create_vm_from_guest_config(const guest_cfg_t *config)
     if (vcpu == NULL) {
         die_reason("Failed to allocate vcpu struct");
     }
+    vcpu->arch_vcpu = (arch_vcpu_t *) hmalloc(sizeof(arch_vcpu_t));
 
     init_vcpu(vcpu);
 
-    /*setup_guest_state(vcpu);*/
+    setup_guest_state(vcpu);
     setup_host_state_area(vcpu);
     setup_vm_execution_control_fields(vcpu);
     configure_vm_exit_controls(vcpu);
