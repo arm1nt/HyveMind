@@ -93,6 +93,7 @@ union vmcs_exit_reason {
                  vm_entry_failure               : 1;
     };
 };
+typedef union vmcs_exit_reason vmcs_exit_reason_t;
 
 #define PIN_BASED_CTL_ACTIVATE      1
 #define PIN_BASED_CTL_DEACTIVATE    0

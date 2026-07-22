@@ -720,6 +720,7 @@ arch_create_vm_from_guest_config(const guest_cfg_t *config)
     }
     vcpu->arch_vcpu = (arch_vcpu_t *) hmalloc(sizeof(arch_vcpu_t));
 
+
     init_vcpu(vcpu);
 
     setup_guest_state(vcpu);
@@ -728,6 +729,6 @@ arch_create_vm_from_guest_config(const guest_cfg_t *config)
     configure_vm_exit_controls(vcpu);
     configure_vm_entry_controls(vcpu);
 
-    try_entry(vcpu);
+    vmx_launch_vcpu(vcpu);
 }
 

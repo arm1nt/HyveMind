@@ -90,7 +90,7 @@
 # Generate the interrupt and exception handler entry points
 #include "asm/idt.h"
 
-.extern vmx_exit_handler
+.extern vmx_vm_exit_handler
 
 .global asm_vmx_exit_handler
 .type asm_vmx_exit_handler, @function
@@ -98,7 +98,7 @@
 asm_vmx_exit_handler:
     movq %rsp, %rbp
     save_registers
-    callq vmx_exit_handler
+    callq vmx_vm_exit_handler
 
     # crash for now
 

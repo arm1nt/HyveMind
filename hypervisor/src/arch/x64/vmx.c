@@ -1,3 +1,4 @@
+#include "fatal.h"
 #include "string.h"
 #include "per-cpu.h"
 #include "pf_alloc.h"
@@ -5,6 +6,7 @@
 #include "asm/cpufeatures.h"
 #include "asm/paging.h"
 #include "asm/processor.h"
+#include "asm/vm.h"
 #include "asm/vmm.h"
 #include "vmx/vmx.h"
 #include "vmx/vmcs.h"
@@ -89,6 +91,20 @@ vmwrite(const enum vmcs_field_encoding encoding, const uint64_t value)
     return res;
 }
 
+static inline int
+vmlaunch(void)
+{
+    asm volatile("vmlaunch");
+    return query_vm_op_status();
+}
+
+static inline int
+vmresume(void)
+{
+    asm volatile("vmresume");
+    return query_vm_op_status();
+}
+
 static inline bool
 has_current_vmcs(void)
 {
@@ -160,6 +176,22 @@ __check_vm_op_status(const uint32_t flags)
 }
 
 static inline void
+sanitize_cr0_for_vmx_operation(cr0_t *cr0)
+{
+    const uint64_t old_cr0_raw = cr0->raw;
+    const uint64_t vmx_cr0_fixed0 = read_msr(MSRX64_IA32_VMX_CR0_FIXED0);
+    const uint64_t vmx_cr0_fixed1 = read_msr(MSRX64_IA32_VMX_CR0_FIXED1);
+    cr0->raw = (cr0->raw | vmx_cr0_fixed0) & vmx_cr0_fixed1;
+
+    if (old_cr0_raw != cr0->raw) {
+        pr_info("CR0 sanitization changed cr0. Old (%lx) vs. new (%lx)",
+                old_cr0_raw,
+                cr0->raw
+        );
+    }
+}
+
+static inline void
 sanitize_cr0_for_vmx(void)
 {
     const uint64_t cr0 = read_cr0();
@@ -202,6 +234,7 @@ create_vmxon_region(void)
 {
     virt_addr_t vaddr;
     if (get_page_zeroed(&vaddr) != 0) {
+        pr_error("Failed to allocate page for a VMXON region");
         return 0;
     }
 
@@ -213,17 +246,25 @@ create_vmxon_region(void)
 static inline phys_addr_t
 create_vmcs_area(void)
 {
+    int res;
     virt_addr_t vaddr;
+
     if (get_page_zeroed(&vaddr) != 0) {
+        pr_error("Failed to allocate page for VMCS area");
         return 0;
     }
 
     const phys_addr_t vmcs_area_ptr = virt_to_phys(vaddr);
     tag_region_with_vmx_revisionid(vmcs_area_ptr);
 
-    if (vmclear(vmcs_area_ptr) != VM_OP_STATUS_SUCCESS) {
+    res = vmclear(vmcs_area_ptr);
+    if (res != VM_OP_STATUS_SUCCESS) {
+        pr_error(
+                "Failed to execute 'vmclear' on newly allocated VMCS area. "
+                "Error status: %lu",
+                res
+        );
         free_page_raw(vmcs_area_ptr);
-        pr_error("Failed to execute 'vmclear' on new vmcs area");
         return 0;
     }
 
@@ -233,19 +274,22 @@ create_vmcs_area(void)
 bool
 enter_vmx_operation(void)
 {
+    int res;
+    phys_addr_t vmxon_region;
     logical_processor_t *current = get_current_logical_processor();
 
     sanitize_control_regs_for_vmx_operation();
 
-    phys_addr_t vmxon_region = create_vmxon_region();
+    vmxon_region = create_vmxon_region();
     if (!vmxon_region) {
-        pr_error("Failed to create a VMXON region");
+        pr_error("Error entering VMX operation: Failed to create a VMXON region");
         return false;
     }
 
-    if (vmxon(vmxon_region) != VM_OP_STATUS_SUCCESS) {
+    res = vmxon(vmxon_region);
+    if (res != VM_OP_STATUS_SUCCESS) {
+        pr_error("Error entering VMX operation: VMXON failed. ""Error status: %lu", res);
         free_page_raw(vmxon_region);
-        pr_error("Failed to enter VMX operation");
         return false;
     }
 
@@ -281,7 +325,7 @@ ensure_vcpu_current(vcpu_t *vcpu)
         return;
     }
 
-    res = vmptrld(vcpu->arch_vcpu.vmcs_ptr);
+    res = vmptrld(vcpu->arch_vcpu->vmcs_ptr);
     if (res != VM_OP_STATUS_SUCCESS) {
         pr_warn("'vmptrld' in ensure_vcpu_current() failed: %lu", res);
         return;
@@ -299,8 +343,69 @@ init_vcpu(vcpu_t *vcpu)
         return -1;
     }
 
-    vcpu->arch_vcpu.vmcs_ptr = vmcs_ptr;
-    vcpu->arch_vcpu.launch_state = VMCS_LS_CLEAR;
+    vcpu->arch_vcpu->vmcs_ptr = vmcs_ptr;
+    vcpu->arch_vcpu->launch_state = VMCS_LS_CLEAR;
     return 0;
+}
+
+void
+vmx_vm_exit_handler(void)
+{
+    vmcs_exit_reason_t exit_reason;
+    uint64_t exit_reason_raw;
+
+    if (vmread(EXIT_REASON, &exit_reason_raw) != VM_OP_STATUS_SUCCESS) {
+        die_reason("vmx exit handler failed to read the exit reason");
+    }
+
+    exit_reason.raw = U64_LOWER32(exit_reason_raw);
+
+    if (exit_reason.vm_entry_failure) {
+        pr_error("Exit caused by vm entry failure");
+        die();
+    } else {
+        pr_info("Normal vm exit");
+    }
+}
+
+/**
+ * TODO: add specific crX setter functions that sanitize the register
+ * before writing it
+ */
+
+inline void
+vmx_write_quadword(vcpu_t *vcpu, const enum vmcs_field_encoding encoding, const uint64_t val)
+{
+    ensure_vcpu_current(vcpu);
+    vmwrite(encoding, val);
+}
+
+void
+vmx_write_doubleword(vcpu_t *vcpu, const enum vmcs_field_encoding encoding, const uint32_t val)
+{
+    vmx_write_quadword(vcpu, encoding, val);
+}
+
+
+void
+vmx_launch_vcpu(vcpu_t *vcpu)
+{
+    int res;
+
+    if (vcpu->arch_vcpu->launch_state != VMCS_LS_CLEAR) {
+        pr_warn("Tried to launch an already launched vcpu.");
+        return;
+    }
+
+    ensure_vcpu_current(vcpu);
+    vcpu->arch_vcpu->launch_state = VMCS_LS_LAUNCHED;
+
+    res = vmlaunch();
+
+    /* Only reachable when vmlaunch fails */
+    pr_error("Faild to launch vcpu. Error status: %lu", res);
+    vcpu->arch_vcpu->launch_state = VMCS_LS_INVALID;
+    /* For now simply die */
+    die();
 }
 
