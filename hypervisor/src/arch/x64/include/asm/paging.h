@@ -71,5 +71,11 @@ is_paging_canonical(const uint64_t vaddr)
            (untranslated_bits == LVL4_PAGING_ONES_CANONICAL_MASK);
 }
 
+static inline uint64_t
+bytes_to_nr_pages(const uint64_t bytes)
+{
+    return (bytes + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
+}
+
 #endif /* _HYVEMIND_X64_ASM_PAGING_H */
 
