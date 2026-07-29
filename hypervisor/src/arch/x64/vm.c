@@ -11,6 +11,7 @@
 #include "asm/processor.h"
 #include "asm/pgtables.h"
 #include "asm/segmentation.h"
+#include "vmx/ept.h"
 #include "vmx/vmx.h"
 
 static inline void
@@ -730,5 +731,38 @@ arch_create_vm_from_guest_config(const guest_cfg_t *config)
     configure_vm_entry_controls(vcpu);
 
     vmx_launch_vcpu(vcpu);
+}
+
+static inline int
+virtualize_physical_memory(const struct guest_config *config)
+{
+    const uint64_t req_bytes = get_req_mem_size_bytes(config);
+    const uint64_t req_pages = bytes_to_nr_pages(req_bytes);
+
+    phys_addr_t contig_vm_area_start;
+    if (get_pages_raw(req_pages, &contig_vm_area_start) != 0) {
+        pr_warn("Failed to allocate %lu contig pages requested by vm", req_pages);
+        return -1;
+    }
+
+    struct ept_mapping_info info = create_ept_mapping_info(
+            0x00,
+            req_bytes,
+            contig_vm_area_start
+    );
+
+    eptp_t eptp;
+    if (create_ept_mapping(&eptp, &info) != 0) {
+        pr_warn("Failed to create ept mapping");
+        return -1;
+    }
+
+    return 0;
+}
+
+void
+arch_vm_from_guest_config(const struct guest_config *config)
+{
+    virtualize_physical_memory(config);
 }
 

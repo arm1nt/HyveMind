@@ -1,140 +1,59 @@
 #ifndef _HYVEMIND_X64_VMX_EPT_H
 #define _HYVEMIND_X64_VMX_EPT_H
 
-#include "hyvstdlib.h"
-#include "mm_types.h"
-#include "types.h"
+#include "vmx/ept_types.h"
 
-#define EPT_MEM_TYPE_UC (0)
-#define EPT_MEM_TYPE_WB (6)
-
-#define EPT_PAGE_WALK_LEN_4 (3)
-#define EPT_PAGE_WALK_LEN_5 (4)
-
-struct vm_addr_space {
-    /**
-     * We could also use non-contigous chunks instead of one large contigous
-     * area.
-     */
-    virt_addr_t __directly_mapped host_start;
-    virt_addr_t __directly_mapped host_end;
-};
-
-union eptp {
-    uint64_t raw;
-    struct {
-        uint64_t mem_type                               : 3,
-                 page_walk_len                          : 3,
-                 enable_accessed_dirty_flags            : 1,
-                 enforce_supervisor_ssp_access_rights   : 1,
-                 reserved0                              : 4,
-                 paddr                                  : 40,
-                 reserved1                              : 12;
-    };
-};
-typedef union eptp eptp_t;
-
-union ept_entry_maps_page {
-    uint64_t raw;
-    struct {
-        uint64_t read_access                    : 1,
-                 write_access                   : 1,
-                 execute_access                 : 1,
-                 ept_mem_type                   : 3,
-                 ignore_pat_type                : 1,
-                 maps_page                      : 1, /* must be 1 */
-                 accessed                       : 1,
-                 dirty                          : 1,
-                 user_mode_execute_access       : 1,
-                 reserved0                      : 1,
-                 paddr                          : 40,
-                 reserved1                      : 5,
-                 vrfy_guest_paging              : 1,
-                 paging_write_access            : 1,
-                 reserved2                      : 1,
-                 supervisor_shadow_stack        : 1,
-                 reserved3                      : 2,
-                 suppress_ve                    : 1;
-    };
-};
-
-union ept_entry_no_page {
-    uint64_t raw;
-    struct {
-        uint64_t read_access                : 1,
-                 write_access               : 1,
-                 execute_access             : 1,
-                 reserved0                  : 5,
-                 accessed                   : 1,
-                 reserved1                  : 1,
-                 user_mode_execute_access   : 1,
-                 reserved2                  : 1,
-                 paddr                      : 40,
-                 reserved3                  : 12;
-    };
-};
-
-typedef union ept_entry_no_page ept_pml4e;
-
-typedef union ept_entry_no_page ept_pdpte_no_page;
-typedef union ept_entry_maps_page ept_pdpte_maps_page;
-
-union ept_pdpt_entry {
-    uint64_t raw;
-    ept_pdpte_maps_page pdpte_page;
-    ept_pdpte_no_page pdpte_no_page;
-};
-typedef union ept_pdpt_entry ept_pdpte;
-
-typedef union ept_entry_no_page ept_pde_no_page;
-typedef union ept_entry_maps_page ept_pde_maps_page;
-
-union ept_pd_entry {
-    uint64_t raw;
-    ept_pde_maps_page pde_page;
-    ept_pde_no_page pde_no_page;
-};
-typedef union ept_pd_entry ept_pde;
-
-union ept_pt_entry {
-    uint64_t raw;
-    struct {
-        uint64_t read_access                : 1,
-                 write_access               : 1,
-                 execute_access             : 1,
-                 ept_mem_type               : 3,
-                 ignore_pat_type            : 1,
-                 ignored0                   : 1,
-                 accessed                   : 1,
-                 dirty                      : 1,
-                 user_mode_execute_access   : 1,
-                 ignored1                   : 1,
-                 paddr                      : 40,
-                 ignored2                   : 5,
-                 vrfy_guest_paging          : 1,
-                 paging_write_access        : 1,
-                 ignored3                   : 1,
-                 supervisor_shadow_stack    : 1,
-                 sub_page_write_permissions : 1,
-                 ignored4                   : 1,
-                 suppress_ve                : 1;
-    };
-};
-typedef union ept_pt_entry ept_pte;
-
-static inline bool
-is_ept_entry_present(const uint64_t raw_entry)
+static inline uint64_t
+__get_ept_xtable_block_end(const uint64_t addr, const int mask_bits)
 {
-    /**
-     * If any of the bits 2:0 is 1 or (if the mode-based execution control
-     * is set) if bit 10 is 1, then the entry is present.
-     */
-
-    const bool lower_bits_zero = ((raw_entry & 7) == 0);
-    const bool bit10_set = IS_SET(raw_entry, U64_LSHIFT(1,10));
-
-    return (!lower_bits_zero) || bit10_set;
+    const uint64_t block_end = addr | (U64_LSHIFT(1,  mask_bits) - 1);
+    return block_end;
 }
+
+/* todo: define macros for the mask bit nrs */
+#define get_ept_pml4e_block_end(addr)   __get_ept_xtable_block_end(addr, 39)
+#define get_ept_pdpte_block_end(addr)   __get_ept_xtable_block_end(addr, 30)
+#define get_ept_pde_block_end(addr)     __get_ept_xtable_block_end(addr, 21)
+#define get_ept_pte_block_end(addr)     __get_ept_xtable_block_end(addr, 12)
+
+/**
+ * @msb_pos ... bit index of the highest bit part of the index calculation
+ */
+static inline int
+__get_ept_xentry_index(const uint64_t addr, const int msb_pos)
+{
+    return (addr << (63 - msb_pos)) >> 55;
+}
+
+/* also define macros for the nrs */
+#define get_ept_pml4_index(addr)    __get_ept_xentry_index(addr, 47)
+#define get_ept_pdpt_index(addr)    __get_ept_xentry_index(addr, 38)
+#define get_ept_pd_index(addr)      __get_ept_xentry_index(addr, 29)
+#define get_ept_pt_index(addr)      __get_ept_xentry_index(addr, 20)
+
+struct ept_mapping_info {
+    gpaddr guest_paddr_start;
+    uint64_t req_bytes;
+    int64_t offset;
+};
+
+static inline struct ept_mapping_info
+create_ept_mapping_info(
+        const gpaddr guest_paddr_start,
+        const uint64_t req_bytes,
+        const phys_addr_t target_host_paddr
+) {
+    struct ept_mapping_info info;
+
+    info.guest_paddr_start = guest_paddr_start;
+    info.req_bytes = req_bytes;
+
+    info.offset = target_host_paddr - guest_paddr_start;
+
+    return info;
+}
+
+int create_ept_mapping(eptp_t *eptp, struct ept_mapping_info *info);
 
 #endif /* _HYVEMIND_X64_VMX_EPT_H */
 
