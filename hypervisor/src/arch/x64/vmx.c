@@ -386,7 +386,6 @@ vmx_write_doubleword(vcpu_t *vcpu, const enum vmcs_field_encoding encoding, cons
     vmx_write_quadword(vcpu, encoding, val);
 }
 
-
 void
 vmx_launch_vcpu(vcpu_t *vcpu)
 {
