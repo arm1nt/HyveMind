@@ -82,6 +82,7 @@ init_guest_cr0_register(vcpu_t *vcpu)
     guest_cr0.wp = 1;
 
     sanitize_cr0_register_for_vmx_operation(&guest_cr0);
+
     vmx_write_quadword(vcpu, GUEST_CR0, guest_cr0.raw);
 }
 
@@ -566,7 +567,7 @@ configure_pin_based_vm_execution_ctls(vcpu_t *vcpu)
     __get_x_ctls_msr(MSR_IA32_VMX_TRUE_PROCBASED_CTLS, MSR_IA32_VMX_PROCBASED_CTLS)
 
 static inline void
-set_reserved_primary_cpu_execution_ctrl_fields(union vmcs_primary_processor_based_ctls_vector *ctrl_vector)
+set_reserved_procbased_ctls1_fields(vmcs_procbased_ctls1 *ctrl_vector)
 {
     const uint64_t procbased_ctls = get_primary_procbased_ctls_msr();
     const uint32_t allowed0 = U64_LOWER32(procbased_ctls);
@@ -577,24 +578,72 @@ set_reserved_primary_cpu_execution_ctrl_fields(union vmcs_primary_processor_base
 }
 
 static inline void
-configure_processor_based_execution_ctls(vcpu_t *vcpu)
+set_reserved_procbased_ctls2_fields(vmcs_procbased_ctls2 *ctrl_vector)
 {
-    /**
-     * For now we only use the primary controls, and even there disable everything
-     * possible.
-     */
-    union vmcs_primary_processor_based_ctls_vector ctrl_vector;
-    ctrl_vector.raw = 0;
-    set_reserved_primary_cpu_execution_ctrl_fields(&ctrl_vector);
+    const uint64_t procbased_ctls2 = read_msr(MSR_IA32_VMX_PROCBASED_CTLS2);
+    const uint32_t allowed1 = U64_UPPER32(procbased_ctls2);
 
-    vmx_write_doubleword(vcpu, PRIMARY_PROC_BASED_VM_EXEC_CONTROLS, ctrl_vector.raw);
+    ctrl_vector->raw &= allowed1;
+}
+
+static inline void
+configure_procbased_ctls2(vcpu_t *vcpu)
+{
+    vmcs_procbased_ctls2 vector;
+    vector.raw = 0;
+
+    vector.enable_ept = 1;
+
+    const uint32_t old_ctls = vector.raw;
+    set_reserved_procbased_ctls2_fields(&vector);
+
+    if (old_ctls != vector.raw) {
+        pr_warn("Reserved fields in 'probased ctls2' vector were set! "
+                "Old: %lx\nNew: %lx",
+                U64(old_ctls),
+                U64(vector.raw)
+        );
+    }
+
+    vmx_write_doubleword(vcpu, SECONDARY_PROC_BASED_VM_EXEC_CONTROLS, vector.raw);
+}
+
+static inline void
+configure_procbased_ctls1(vcpu_t *vcpu)
+{
+    vmcs_procbased_ctls1 vector;
+    vector.raw = 0;
+    set_reserved_procbased_ctls1_fields(&vector);
+
+    /* TODO: Properly check if CPU supports activating secondary procbased ctls */
+    vector.activate_secondary_controls = 1;
+
+    const uint32_t old_vector_raw = vector.raw;
+    set_reserved_procbased_ctls1_fields(&vector);
+
+    if (old_vector_raw != vector.raw) {
+        pr_warn("Reserved fields in 'procbased ctls1' vector were set! "
+                "Old: %lx\nNew: %lx",
+                U64(old_vector_raw),
+                U64(vector.raw)
+        );
+    }
+
+    vmx_write_doubleword(vcpu, PRIMARY_PROC_BASED_VM_EXEC_CONTROLS, vector.raw);
+}
+
+static inline void
+configure_procbased_execution_ctls(vcpu_t *vcpu)
+{
+    configure_procbased_ctls1(vcpu);
+    configure_procbased_ctls2(vcpu);
 }
 
 static inline void
 setup_vm_execution_control_fields(vcpu_t *vcpu)
 {
     configure_pin_based_vm_execution_ctls(vcpu);
-    configure_processor_based_execution_ctls(vcpu);
+    configure_procbased_execution_ctls(vcpu);
 }
 
 /******************************************************************************
@@ -712,17 +761,64 @@ configure_vm_entry_controls(vcpu_t *vcpu)
  * VM setup
 ******************************************************************************/
 
+static inline int
+virtualize_physical_memory(const struct guest_config *config, vcpu_t *vcpu)
+{
+    const uint64_t req_bytes = get_req_mem_size_bytes(config);
+    const uint64_t req_pages = bytes_to_nr_pages(req_bytes);
+
+    /**
+     * todo: change to only map to allocated space instead of
+     * identity-mapping physical addr space.
+     */
+    phys_addr_t contig_vm_area_start = 0x00;
+    /*if (get_pages_raw(req_pages, &contig_vm_area_start) != 0) {
+        pr_warn("Failed to allocate %lu contig pages requested by vm", req_pages);
+        return -1;
+    }*/
+
+    struct ept_mapping_info info = create_ept_mapping_info(
+            0x00,
+            req_bytes,
+            contig_vm_area_start
+    );
+
+    /* Remove later */
+    info.offset = 0;
+
+    info.pml4e_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
+    info.pdpte_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
+    info.pde_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
+    info.pte_pfags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG | EPT_MEM_TYPE_WB_FLAG;
+
+    eptp_t eptp;
+    if (create_ept_mapping(&eptp, &info) != 0) {
+        pr_error("Failed to create EPT mapping");
+        return -1;
+    }
+
+    vmx_write_quadword(vcpu, EPT_POINTER, eptp.raw);
+    return 0;
+}
+
 void
 arch_create_vm_from_guest_config(const guest_cfg_t *config)
 {
+    int ret;
+
     vcpu_t *vcpu = (vcpu_t *) hmalloc(sizeof(vcpu_t));
     if (vcpu == NULL) {
         die_reason("Failed to allocate vcpu struct");
     }
     vcpu->arch_vcpu = (arch_vcpu_t *) hmalloc(sizeof(arch_vcpu_t));
 
-
     init_vcpu(vcpu);
+
+    ret = virtualize_physical_memory(config, vcpu);
+    if (ret != 0) {
+        pr_error("Error setting up virtualization of physical memory");
+        die();
+    }
 
     setup_guest_state(vcpu);
     setup_host_state_area(vcpu);
@@ -731,38 +827,5 @@ arch_create_vm_from_guest_config(const guest_cfg_t *config)
     configure_vm_entry_controls(vcpu);
 
     vmx_launch_vcpu(vcpu);
-}
-
-static inline int
-virtualize_physical_memory(const struct guest_config *config)
-{
-    const uint64_t req_bytes = get_req_mem_size_bytes(config);
-    const uint64_t req_pages = bytes_to_nr_pages(req_bytes);
-
-    phys_addr_t contig_vm_area_start;
-    if (get_pages_raw(req_pages, &contig_vm_area_start) != 0) {
-        pr_warn("Failed to allocate %lu contig pages requested by vm", req_pages);
-        return -1;
-    }
-
-    struct ept_mapping_info info = create_ept_mapping_info(
-            0x00,
-            req_bytes,
-            contig_vm_area_start
-    );
-
-    eptp_t eptp;
-    if (create_ept_mapping(&eptp, &info) != 0) {
-        pr_warn("Failed to create ept mapping");
-        return -1;
-    }
-
-    return 0;
-}
-
-void
-arch_vm_from_guest_config(const struct guest_config *config)
-{
-    virtualize_physical_memory(config);
 }
 

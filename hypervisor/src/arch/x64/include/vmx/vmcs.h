@@ -256,6 +256,7 @@ union vmcs_primary_processor_based_ctls_vector {
                  activate_secondary_controls    : 1;
     };
 };
+typedef union vmcs_primary_processor_based_ctls_vector vmcs_procbased_ctls1;
 
 union vmcs_secondary_processor_based_ctls_vector {
     uint32_t raw;
@@ -293,6 +294,7 @@ union vmcs_secondary_processor_based_ctls_vector {
                  instruction_timeout                : 1;
     };
 };
+typedef union vmcs_secondary_processor_based_ctls_vector vmcs_procbased_ctls2;
 
 union vmcs_tertiary_processor_based_ctls_vector {
     uint64_t raw;
@@ -312,6 +314,7 @@ union vmcs_tertiary_processor_based_ctls_vector {
                  reserved1                      : 51;
     };
 };
+typedef union vmcs_tertiary_processor_based_ctls_vector  vmcs_procbased_ctls3;
 
 union vmcs_primary_vm_exit_ctls_vector {
     uint32_t raw;
