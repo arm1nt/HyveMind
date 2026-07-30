@@ -79,7 +79,7 @@ union guest_state_access_rights {
 };
 
 enum vmcs_basic_exit_reason {
-    EXIT_REASON_EXCEPTION,
+    EXIT_REASON_EXCEPTION                       = 0,
     EXIT_REASON_EXT_INTR,
     EXIT_REASON_TRIPLE_FAULT,
     EXIT_REASON_INIT,
@@ -114,12 +114,12 @@ enum vmcs_basic_exit_reason {
     EXIT_REASON_WRMSR_IMPLICIT_WRMSRNS,
     EXIT_REASON_VM_ENTRY_INV_GUEST_STATE,
     EXIT_REASON_VM_ENTRY_MSR_LOADING,
-    EXIT_REASON_MWAIT,
+    EXIT_REASON_MWAIT                           = 36,
     EXIT_REASON_MONITOR_TRAP_FLAG,
-    EXIT_REASON_MONITOR,
+    EXIT_REASON_MONITOR                         = 39,
     EXIT_REASON_PAUSE,
     EXIT_REASON_VM_ENTRY_MACHINE_CHECK,
-    EXIT_REASON_TRP_BELOW_THRESHOLD,
+    EXIT_REASON_TRP_BELOW_THRESHOLD             = 43,
     EXIT_REASON_APIC_ACCESS,
     EXIT_REASON_VIRTUALIZED_EOI,
     EXIT_REASON_GDTR_IDTR_ACCESS,
@@ -146,7 +146,7 @@ enum vmcs_basic_exit_reason {
     EXIT_REASON_UMWAIT,
     EXIT_REASON_TPAUSE,
     EXIT_REASON_LOADIWKEY,
-    EXIT_REASON_ENQCMD_PASID_TRANSLATION,
+    EXIT_REASON_ENQCMD_PASID_TRANSLATION        = 72,
     EXIT_REASON_ENQCMDS_PASID_TRANSLATION,
     EXIT_REASON_BUS_LOCK,
     EXIT_REASON_INSTRUCTION_TIMEOUT,
@@ -156,7 +156,7 @@ enum vmcs_basic_exit_reason {
     EXIT_REASON_WRMSRLIST,
     EXIT_REASON_URDMSR,
     EXIT_REASON_UWRMSR,
-    EXIT_REASON_RDMSR_IMMEDIATE,
+    EXIT_REASON_RDMSR_IMMEDIATE                 = 84,
     EXIT_REASON_WRMSRNS_IMMEDIATE,
 };
 
@@ -176,6 +176,35 @@ union vmcs_exit_reason {
     };
 };
 typedef union vmcs_exit_reason vmcs_exit_reason_t;
+
+union vmcs_ept_violation_exit_qual {
+    uint64_t raw;
+    struct {
+        uint64_t data_read                              : 1,
+                 data_write                             : 1,
+                 instruction_fetch                      : 1,
+                 bit0_land                              : 1,
+                 bit1_land                              : 1,
+                 bit2_land                              : 1,
+                 bit10_land                             : 1,
+                 linear_addr_valid                      : 1,
+                 linear_addr_translation_acccess_error  : 1,
+                 user_mode_linear_addr                  : 1,
+                 rw_page_translation                    : 1,
+                 xd_page_translation                    : 1,
+                 iret_nmi_unblocking                    : 1,
+                 shadow_stack_access                    : 1,
+                 bit60_of_page_mapping_ept_entry        : 1,
+                 guest_paging_verification              : 1,
+                 accesss_async_to_instruction_execution : 1,
+                 undefined0                             : 47;
+    };
+};
+typedef union vmcs_ept_violation_exit_qual vmcs_ept_exit_qual_t;
+
+union vmcs_exit_qualification {
+    vmcs_ept_exit_qual_t ept_violation_exqual;
+};
 
 #define PIN_BASED_CTL_ACTIVATE      1
 #define PIN_BASED_CTL_DEACTIVATE    0
