@@ -5,9 +5,9 @@
 #include "per-cpu.h"
 
 DECLARE_PER_CPU(uint64_t, max_phys_addr);
+#define MAX_PHYS_ADDR percpu_val(max_phys_addr)
 
 extern uint64_t max_phys_addr;
-#define MAX_PHYS_ADDR max_phys_addr;
 
 int early_mm_init(void);
 
