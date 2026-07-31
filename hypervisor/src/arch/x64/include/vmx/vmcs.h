@@ -77,6 +77,7 @@ union guest_state_access_rights {
                  reserved1: 15;
     };
 };
+typedef union guest_state_access_rights guest_access_rights_t;
 
 enum vmcs_basic_exit_reason {
     EXIT_REASON_EXCEPTION                       = 0,
@@ -222,6 +223,7 @@ union vmcs_pin_based_ctls_vector {
                  reserved2                      : 24;
     };
 };
+typedef union vmcs_pin_based_ctls_vector vmcs_pin_ctls;
 
 union vmcs_primary_processor_based_ctls_vector {
     uint32_t raw;
@@ -314,7 +316,7 @@ union vmcs_tertiary_processor_based_ctls_vector {
                  reserved1                      : 51;
     };
 };
-typedef union vmcs_tertiary_processor_based_ctls_vector  vmcs_procbased_ctls3;
+typedef union vmcs_tertiary_processor_based_ctls_vector vmcs_procbased_ctls3;
 
 union vmcs_primary_vm_exit_ctls_vector {
     uint32_t raw;
@@ -344,6 +346,7 @@ union vmcs_primary_vm_exit_ctls_vector {
                  activate_secondary_controls        : 1;
     };
 };
+typedef union vmcs_primary_vm_exit_ctls_vector vmcs_exit_ctls1;
 
 union vmcs_secondary_vm_exit_ctls_vector {
     uint64_t raw;
@@ -355,6 +358,7 @@ union vmcs_secondary_vm_exit_ctls_vector {
                  reserved0                      : 60;
     };
 };
+typedef union vmcs_secondary_vm_exit_ctls_vector vmcs_exit_ctls2;
 
 union vmcs_vm_entry_ctls_vector {
     uint32_t raw;
@@ -382,6 +386,7 @@ union vmcs_vm_entry_ctls_vector {
                  reserved3                          : 6;
     };
 };
+typedef union vmcs_vm_entry_ctls_vector vmcs_entry_ctls;
 
 enum vmcs_guest_activity_state {
     GUEST_ACTIVE,
