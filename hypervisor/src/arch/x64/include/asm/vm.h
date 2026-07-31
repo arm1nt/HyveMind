@@ -27,7 +27,7 @@ struct arch_vcpu {
         enum vcpu_cpu_mode cpu_mode;
 
         cr0_t cr0;
-        uint64_t cr3; /* change */
+        cr3_t cr3;
         cr4_t cr4;
         uint64_t dr7;
 
@@ -45,8 +45,8 @@ struct arch_vcpu {
     } hw;
 };
 
-int allocate_arch_vcpu(struct arch_vcpu *vcpu);
-void destroy_arch_vcpu(struct arch_vcpu *vcpu);
+int allocate_arch_vcpu(struct vcpu *vcpu);
+void destroy_arch_vcpu(struct vcpu *vcpu);
 
 int arch_init_vm(struct vm *vm, const struct guest_config *config);
 

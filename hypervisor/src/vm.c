@@ -6,7 +6,7 @@
 static inline void
 destroy_vcpu(vcpu_t *vcpu)
 {
-    destroy_arch_vcpu(&vcpu->arch);
+    destroy_arch_vcpu(vcpu);
     hfree(vcpu);
 }
 
@@ -21,6 +21,7 @@ destroy_vcpus(vcpu_t **vcpus, const unsigned int nr)
 inline void
 destroy_vm(struct vm *vm)
 {
+    pr_debug("Destroying VM '%s'", vm->name);
     destroy_vcpus(vm->vcpus, vm->nr_vcpus);
     hfree(vm->vcpus);
     hfree(vm);
@@ -39,7 +40,7 @@ allocate_vcpu(struct vm *vm)
 
     vcpu->vm = vm;
 
-    if (allocate_arch_vcpu(&vcpu->arch) != 0) {
+    if (allocate_arch_vcpu(vcpu) != 0) {
         pr_error("Unable to allocate arch vcpu members");
         hfree(vcpu);
         return NULL;
@@ -107,6 +108,7 @@ create_vm(const struct guest_config *config)
         return NULL;
     }
 
+    pr_debug("Successfully created VM '%s'", vm->name);
     return vm;
 }
 
