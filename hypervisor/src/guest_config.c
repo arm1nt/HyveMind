@@ -15,6 +15,7 @@ static struct guest_config guest_configs[GUEST_CFG_NUMBER_OF_GUESTS] = {
         .nr_vcpus = 1,
         .mem_size = 1024,
         .mem_granularity = GB,
+        .guest_type = LINUX_DIRECT_BOOT_32BIT,
         .bzImageName = "vm1-bzImage",
         .initramfsName = "vm1-initramfs",
     },

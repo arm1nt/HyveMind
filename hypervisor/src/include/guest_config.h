@@ -10,8 +10,15 @@ enum mem_granularity {
     GB,
 };
 
+enum guest_type {
+    MIRROR_VMM,
+    LINUX_DIRECT_BOOT_32BIT,
+};
+
 struct guest_config {
     char *name;
+
+    enum guest_type guest_type;
 
     unsigned int nr_vcpus;
     uint64_t mem_size;
