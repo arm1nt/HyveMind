@@ -73,6 +73,14 @@ write_rflags(uint64_t flags)
     );
 }
 
+static inline ia32_efer_t
+read_efer(void)
+{
+    ia32_efer_t efer;
+    efer.raw = read_msr(MSR_IA32_EFER);
+    return efer;
+}
+
 DECLARE_PER_CPU(uint32_t, cpuid_range_base);
 DECLARE_PER_CPU(uint32_t, cpuid_max_leaf);
 DECLARE_PER_CPU(uint32_t, cpuid_extended_range_base);

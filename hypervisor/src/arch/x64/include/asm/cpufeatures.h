@@ -65,7 +65,7 @@
 ******************************************************************************/
 
 enum general_msr {
-    MSRX64_IA32_EFER                = 0xC0000080,
+    MSR_IA32_EFER                   = 0xC0000080,
     MSRX64_IA32_FEATURE_CONTROL_MSR = 0x3A,
 };
 
