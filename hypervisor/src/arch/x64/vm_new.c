@@ -30,14 +30,21 @@ reset_vcpu_seg_regs_to_processor_init_state(vcpu_t *vcpu)
     segments->fs = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
     segments->gs = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
 
-    vmcs_ar_t ldtr_tr_ar;
-    ldtr_tr_ar.raw = 0;
-    ldtr_tr_ar.present = SEGMENT_PRESENT;
-    ldtr_tr_ar.descriptor_type = CODE_DATA_SEGMENT_DESC;
-    ldtr_tr_ar.segment_type = DATA_RW;
+    vmcs_ar_t ldtr_ar;
+    ldtr_ar.raw = 0;
+    ldtr_ar.present = SEGMENT_PRESENT;
+    ldtr_ar.descriptor_type = SYSTEM_SEGMENT_DESC;
+    ldtr_ar.segment_type = IA32E_LDT;
 
-    segments->ldtr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, ldtr_tr_ar);
-    segments->tr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, ldtr_tr_ar);
+    segments->ldtr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, ldtr_ar);
+
+    vmcs_ar_t tr_ar;
+    tr_ar.raw = 0;
+    tr_ar.present = SEGMENT_PRESENT;
+    tr_ar.descriptor_type = SYSTEM_SEGMENT_DESC;
+    tr_ar.segment_type = IA32E_TSS_BUSY;
+
+    segments->tr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, tr_ar);
 }
 
 static void
