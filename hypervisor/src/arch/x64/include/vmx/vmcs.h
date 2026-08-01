@@ -2,6 +2,7 @@
 #define _HYVEMIND_X64_VMX_VMCS_H
 
 #include "hyvstdlib.h"
+#include "mm_types.h"
 
 struct vmcs_hdr {
     uint32_t revision_id: 31,
@@ -78,6 +79,7 @@ union guest_state_access_rights {
     };
 };
 typedef union guest_state_access_rights guest_access_rights_t;
+typedef guest_access_rights_t vmcs_ar_t;
 
 enum vmcs_basic_exit_reason {
     EXIT_REASON_EXCEPTION                       = 0,
@@ -543,6 +545,12 @@ enum vmcs_field_encoding: uint64_t {
     HOST_RIP                                = 0x00006c16,
 };
 typedef uint64_t vmcs_field_encoding_t;
+
+struct vcpu;
+
+phys_addr_t create_new_vmcs_area(void);
+void dump_vmcs(const struct vcpu *vcpu);
+
 
 void vmcs_write_field(const vmcs_field_encoding_t encoding, const uint64_t value);
 #define vmcs_write_16bit_field(encoding, value) vmcs_write_field(encoding, value)

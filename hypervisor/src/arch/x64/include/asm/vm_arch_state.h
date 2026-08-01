@@ -6,12 +6,25 @@
 #include "vmx/vmcs.h"
 
 enum vcpu_cpu_mode {
+    REAL_MODE_16B,
     PROTECTED_MODE_32B,
     LONG_MODE_64B,
 };
 
+#define DEFINE_VCPU_SEG(_selector, _base, _limit, _ar)  \
+    (struct vcpu_segment)                               \
+    {                                                   \
+        .raw_selector = (_selector),                    \
+        .base = (_base),                                \
+        .limit = (_limit),                              \
+        .access_rights = (_ar),                         \
+    }
+
 struct vcpu_segment {
-    segment_selector_t selector;
+    union {
+        segment_selector_t selector;
+        uint16_t raw_selector;
+    };
     uint64_t base;
     uint32_t limit;
     guest_access_rights_t access_rights;
