@@ -25,6 +25,40 @@ union cr0 {
 };
 typedef union cr0 cr0_t;
 
+union cr3_32bit {
+    uint32_t raw;
+    struct {
+        uint32_t ignored0       : 3,
+                 pwt            : 1,
+                 pcd            : 1,
+                 ignored1       : 7,
+                 paddr          : 20;
+    };
+};
+typedef union cr3_32bit cr3_32b_t;
+
+union cr3_64bit {
+    uint64_t raw;
+    struct {
+        uint64_t ignored0       : 3,
+                 pwt            : 1,
+                 pcd            : 1,
+                 ignored1       : 7,
+                 paddr          : 40,
+                 reserved0      : 9,
+                 lam57          : 1,
+                 lam48          : 1,
+                 reserved1      : 1;
+    };
+};
+typedef union cr3_64bit cr3_64b_t;
+
+union cr3u {
+    cr3_32b_t cr3_32b;
+    cr3_64b_t cr3_64b;
+};
+typedef union cr3u cr3_t;
+
 union cr4 {
     uint64_t raw;
     struct {
