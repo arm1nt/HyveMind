@@ -26,5 +26,7 @@ __die_reason(const char *file, const int line, const char *msg)
     __die(file, line);
 }
 
+#define NOT_YET_IMPLEMENTED die_reason("Not yet implemented")
+
 #endif /* _HYVEMIND_FATAL_H */
 
