@@ -103,6 +103,11 @@ enum vmx_msr {
     MSRX64_IA32_VMX_CR4_FIXED1          = 0x489,
 
     MSRX64_IA32_VMX_VMCS_ENUM           = 0x48A,
+    /**
+     * This MSR exists only if
+     *  - bit 63 of VMX_PROCBASED_CTLS is 1 (secondary procbased ctls)
+     *  - bit 33 or 37 of VMX_PROCBASED_CTLS2 is 1
+     */
     MSRX64_IA32_VMX_EPT_VPID_CAP        = 0x48C,
     MSRX64_IA32_VMX_VMFUNC              = 0x491,
 
@@ -134,7 +139,20 @@ enum vmx_basic_msr_bit_pos {
 
 #define VMX_BASIC_ADDR_WIDTH        U64_LSHIFT(1, VMX_BASIC_ADDR_WIDTH_BIT)
 /* Indicates whether any default1 values may be 0 (Appendix A.2) */
-#define VMX_BASIC_DEFAULT1_MAY_BE_0 U64_LSHIFT(1, VMX_BASIC_DEFAULT1_MAY_BE_0_BIT)
+#define VMX_BASIC_DEFAULT1_CTLS_MAY_BE_0 \
+    U64_LSHIFT(1, VMX_BASIC_DEFAULT1_MAY_BE_0_BIT)
+
+enum vmx_ept_vpid_cap_msr_bit_pos {
+    EPT_VPID_CAP_EXECUTE_ONLY_TRANSLATIONS_BIT  = 0,
+    EPT_VPID_CAP_PAGE_WALK_LEN4_BIT             = 6,
+    EPT_VPID_CAP_PAGE_WALK_LEN5_BIT             = 7,
+    EPT_VPID_CAP_MEM_TYPE_UC_BIT                = 8,
+    EPT_VPID_CAP_MEM_TYPE_WB_BIT                = 14,
+    EPT_VPID_CAP_MB_PAGES_BIT                   = 16,
+    EPT_VPID_CAP_GB_PAGES_BIT                   = 17,
+    EPT_VPID_CAP_ACCESSED_DIRTY_BIT             = 21,
+    EPT_VPID_CAP_ADVANCED_EPT_VIOLATIONS_BIT    = 22,
+};
 
 //#define VMX_BASIC_REV_ID_LEN        31
 //#define VMX_BASIC_REV_ID_MASK       U64_X_LSBS_SET(VMX_BASIC_REV_ID_LEN)

@@ -3,6 +3,8 @@
 
 #include "hyvstdlib.h"
 #include "mm_types.h"
+#include "asm/cpufeatures.h"
+#include "asm/processor.h"
 
 struct vmcs_hdr {
     uint32_t revision_id: 31,
@@ -209,8 +211,14 @@ union vmcs_exit_qualification {
     vmcs_ept_exit_qual_t ept_violation_exqual;
 };
 
-#define PIN_BASED_CTL_ACTIVATE      1
-#define PIN_BASED_CTL_DEACTIVATE    0
+#define VMX_DEFAULT1_CTLS_MAY_BE_0() \
+    (IS_SET(read_msr(MSRX64_IA32_VMX_BASIC), VMX_BASIC_DEFAULT1_CTLS_MAY_BE_0))
+
+static inline uint64_t
+__get_x_ctls_msr(const uint64_t true_msr, const uint64_t msr)
+{
+    return VMX_DEFAULT1_CTLS_MAY_BE_0() ? read_msr(true_msr) : read_msr(msr);
+}
 
 union vmcs_pin_based_ctls_vector {
     uint32_t raw;
@@ -226,6 +234,12 @@ union vmcs_pin_based_ctls_vector {
     };
 };
 typedef union vmcs_pin_based_ctls_vector vmcs_pin_ctls;
+
+#define VMCS_PIN_BASED_CTLS_DEFAULT1 \
+    ((U32_LSHIFT(1, 1)) | (U32_LSHIFT(1, 2)) | (U32_LSHIFT(1, 4)))
+
+#define get_pinbased_ctls_msr() \
+    __get_x_ctls_msr(MSR_IA32_VMX_TRUE_PINBASED_CTLS, MSR_IA32_VMX_PINBASED_CTLS)
 
 union vmcs_primary_processor_based_ctls_vector {
     uint32_t raw;
@@ -261,6 +275,12 @@ union vmcs_primary_processor_based_ctls_vector {
     };
 };
 typedef union vmcs_primary_processor_based_ctls_vector vmcs_procbased_ctls1;
+
+#define VMCS_PROCBASED_CTLS1_DEFAULT1 \
+    (U32_LSHIFT(1,1) | U32_LSHIFT(7, 4) | U32_LSHIFT(1, 8) | U32_LSHIFT(15, 13), U32_LSHIFT(1, 26))
+
+#define get_procbased_ctls1_msr() \
+    __get_x_ctls_msr(MSR_IA32_VMX_TRUE_PROCBASED_CTLS, MSR_IA32_VMX_PROCBASED_CTLS)
 
 union vmcs_secondary_processor_based_ctls_vector {
     uint32_t raw;
@@ -300,6 +320,11 @@ union vmcs_secondary_processor_based_ctls_vector {
 };
 typedef union vmcs_secondary_processor_based_ctls_vector vmcs_procbased_ctls2;
 
+#define vmcs_procbased_ctls2_supported() \
+    (IS_SET(read_msr(MSR_IA32_VMX_PROCBASED_CTLS), 63))
+
+#define get_procbased_ctls2_msr() (read_msr(MSR_IA32_VMX_PROCBASED_CTLS2))
+
 union vmcs_tertiary_processor_based_ctls_vector {
     uint64_t raw;
     struct {
@@ -319,6 +344,11 @@ union vmcs_tertiary_processor_based_ctls_vector {
     };
 };
 typedef union vmcs_tertiary_processor_based_ctls_vector vmcs_procbased_ctls3;
+
+#define vmcs_procbased_ctls3_supported() \
+    (IS_SET(read_msr(MSR_IA32_VMX_PROCBASED_CTLS), 49))
+
+#define get_procbased_ctls3_msr() (read_msr(MSR_IA32_VMX_PROCBASED_CTLS3))
 
 union vmcs_primary_vm_exit_ctls_vector {
     uint32_t raw;
@@ -350,6 +380,12 @@ union vmcs_primary_vm_exit_ctls_vector {
 };
 typedef union vmcs_primary_vm_exit_ctls_vector vmcs_exit_ctls1;
 
+#define VMCS_EXIT_CTLS1_DEFAULT1 \
+    (U32(511) | U32_LSHIFT(3, 10) | U32_LSHIFT(3, 13) | U32_LSHIFT(3, 16))
+
+#define get_vmexit_ctls1_msr() \
+    __get_x_ctls_msr(MSR_IA32_VMX_TRUE_EXIT_CTLS, MSR_IA32_VMX_EXIT_CTLS)
+
 union vmcs_secondary_vm_exit_ctls_vector {
     uint64_t raw;
     struct {
@@ -361,6 +397,11 @@ union vmcs_secondary_vm_exit_ctls_vector {
     };
 };
 typedef union vmcs_secondary_vm_exit_ctls_vector vmcs_exit_ctls2;
+
+#define vmcs_vmexit_ctls2_supported() \
+    (IS_SET(read_msr(MSR_IA32_VMX_EXIT_CTLS), 63))
+
+#define get_vmexit_ctls2_msr() (read_msr(MSR_IA32_VMX_EXIT_CTLS2))
 
 union vmcs_vm_entry_ctls_vector {
     uint32_t raw;
@@ -389,6 +430,11 @@ union vmcs_vm_entry_ctls_vector {
     };
 };
 typedef union vmcs_vm_entry_ctls_vector vmcs_entry_ctls;
+
+#define VMCS_ENTRY_CTLS_DEFAULT1 (U32(511) | U32_LSHIFT(1, 12))
+
+#define get_vmentry_ctls_msr() \
+    __get_x_ctls_msr(MSR_IA32_VMX_TRUE_ENTRY_CTLS, MSR_IA32_VMX_ENTRY_CTLS)
 
 enum vmcs_guest_activity_state {
     GUEST_ACTIVE,

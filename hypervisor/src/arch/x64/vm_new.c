@@ -144,6 +144,7 @@ init_vcpu(vcpu_t *vcpu)
     }
 
     reset_vcpu_to_processor_init_state(vcpu);
+    vmx_init_default_policy(vcpu->arch.hw.vmx.virt_policy);
 
     return 0;
 }
