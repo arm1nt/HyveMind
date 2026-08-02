@@ -42,8 +42,10 @@ enum code_data_segment_type {
 };
 typedef enum code_data_segment_type code_data_seg_type_t;
 
+/* TODO: split into separate enums for 32bit and 64bit */
 enum system_segment_type {
     IA32E_LDT               = 2,
+    IA32_16BIT_TSS_BUSY     = 3,
     IA32E_TSS               = 9,
     IA32E_TSS_BUSY          = 11,
     IA32E_INTERRUPT_GATE    = 14,
@@ -116,7 +118,7 @@ void reload_tr_register(const segment_selector_t *selector);
 segment_selector_t read_task_register(void);
 virt_addr_t get_base_from_tss_descriptor(const tss_descriptor_t *desc);
 
-segment_selector_t get_cs(void);
+segment_selector_t read_cs_register(void);
 
 int get_cpl(void);
 

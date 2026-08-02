@@ -35,6 +35,14 @@ read_task_register(void)
     return tss_selector;
 }
 
+segment_selector_t
+read_cs_register(void)
+{
+    segment_selector_t cs;
+    asm volatile("mov %%cs, %0" : "=m"(cs));
+    return cs;
+}
+
 virt_addr_t
 get_base_from_tss_descriptor(const tss_descriptor_t *desc)
 {
