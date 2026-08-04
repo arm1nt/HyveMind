@@ -98,6 +98,12 @@ union cr4 {
 };
 typedef union cr4 cr4_t;
 
+enum x86_control_regs {
+    X86_CR0,
+    X86_CR3,
+    X86_CR4,
+};
+
 union rflags {
     uint64_t raw;
     struct {
@@ -140,6 +146,23 @@ union ia32_efer {
     };
 };
 typedef union ia32_efer ia32_efer_t;
+
+enum x86_segment_reg {
+    X86_CS_REG,
+    X86_SS_REG,
+    X86_DS_REG,
+    X86_ES_REG,
+    X86_FS_REG,
+    X86_GS_REG,
+
+    X86_TR_REG,
+    X86_LDTR_REG,
+};
+
+enum x86_sys_table {
+    X86_GDT,
+    X86_IDT,
+};
 
 #endif /* _HYVEMIND_X64_ASM_X86_DEFS_H */
 
