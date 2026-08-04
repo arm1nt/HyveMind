@@ -36,6 +36,7 @@ enum vmx_policy_option {
     VMX_POLICY_PROCBASED_CTLS3,
     VMX_POLICY_VM_EXIT_CTLS2,
     VMX_POLICY_EPT,
+    VMX_POLICY_MSR_BITMAP,
 };
 
 enum vmx_policy_vrfy_status {

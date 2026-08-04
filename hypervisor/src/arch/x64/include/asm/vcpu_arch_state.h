@@ -1,15 +1,9 @@
-#ifndef _HYVEMIND_X64_ASM_VM_ARCH_STATE_H
-#define _HYVEMIND_X64_ASM_VM_ARCH_STATE_H
+#ifndef _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H
+#define _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H
 
 #include "hyvstdlib.h"
 #include "asm/segmentation.h"
 #include "vmx/vmcs.h"
-
-enum vcpu_cpu_mode {
-    REAL_MODE_16B,
-    PROTECTED_MODE_32B,
-    LONG_MODE_64B,
-};
 
 #define DEFINE_VCPU_SEG(_selector, _base, _limit, _ar)  \
     (struct vcpu_segment)                               \
@@ -83,5 +77,18 @@ struct vcpu_segments {
     struct vcpu_segment tr;
 };
 
-#endif /* _HYVEMIND_X64_ASM_VM_ARCH_STATE_H */
+struct vcpu_guest_arch_state {
+    cr0_t cr0;
+    cr3_t cr3;
+    cr4_t cr4;
+    uint64_t dr7;
+    ia32_efer_t efer;
+
+    struct vcpu_user_regs uregs;
+    struct vcpu_segments segments;
+    struct vcpu_sys_table gdtr;
+    struct vcpu_sys_table idtr;
+};
+
+#endif /* _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H */
 
