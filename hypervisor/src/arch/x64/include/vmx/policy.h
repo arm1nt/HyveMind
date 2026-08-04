@@ -37,6 +37,7 @@ enum vmx_policy_option {
     VMX_POLICY_VM_EXIT_CTLS2,
     VMX_POLICY_EPT,
     VMX_POLICY_MSR_BITMAP,
+    VMX_POLICY_UNRESTRICTED_GUEST,
 };
 
 enum vmx_policy_vrfy_status {
@@ -58,6 +59,9 @@ bool vmx_policy_is_option_configured(
         const struct vmx_virt_policy *policy,
         const enum vmx_policy_option option
 );
+
+#define vcpu_has_option_configured(_vcpu, _option) \
+    vmx_policy_is_option_configured(_vcpu->arch.hw.vmx.virt_policy, _option)
 
 int validate_vmx_virt_policy(const struct vmx_virt_policy *policy);
 

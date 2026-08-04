@@ -153,6 +153,7 @@ init_vmx_capabilities(void)
     vmcs_procbased_ctls1 min_proc_ctls1;
     min_proc_ctls1.raw = 0;
     min_proc_ctls1.activate_secondary_controls = 1;
+    min_proc_ctls1.msr_bitmaps = 1;
 
     vmx_caps.proc_ctls1 = set_reserved_procbased_ctls1_default1(min_proc_ctls1);
     if ((vmx_caps.proc_ctls1.raw & min_proc_ctls1.raw) != min_proc_ctls1.raw) {
@@ -249,6 +250,11 @@ vmx_caps_is_option_supported(const enum vmx_policy_option option)
         case VMX_POLICY_EPT:
             return vmx_caps.proc_ctls1.activate_secondary_controls
                 && vmx_caps.proc_ctls2.enable_ept;
+        case VMX_POLICY_MSR_BITMAP:
+            return vmx_caps.proc_ctls1.msr_bitmaps;
+        case VMX_POLICY_UNRESTRICTED_GUEST:
+            return vmx_caps.proc_ctls1.activate_secondary_controls
+                && vmx_caps.proc_ctls2.unrestricted_guest;
         default:
             return false;
     }
@@ -274,7 +280,27 @@ vmx_policy_is_option_configured(
         const struct vmx_virt_policy *policy,
         const enum vmx_policy_option option
 ) {
-    NOT_YET_IMPLEMENTED;
+    switch (option) {
+        case VMX_POLICY_PROCBASED_CTLS2:
+            return policy->proc_ctls1.activate_secondary_controls;
+        case VMX_POLICY_PROCBASED_CTLS3:
+            return policy->proc_ctls1.activate_tertiary_controls;
+        case VMX_POLICY_VM_EXIT_CTLS2:
+            return policy->exit_ctls1.activate_secondary_controls;
+        case VMX_POLICY_EPT:
+            return policy->proc_ctls1.activate_secondary_controls
+                && policy->proc_ctls2.enable_ept;
+        case VMX_POLICY_MSR_BITMAP:
+            return policy->proc_ctls1.msr_bitmaps;
+        case VMX_POLICY_UNRESTRICTED_GUEST:
+            return policy->proc_ctls1.activate_secondary_controls
+                && policy->proc_ctls2.unrestricted_guest;
+        default:
+            pr_warn("No policy-support lookup for: %lu", U64(option));
+            return false;
+    }
+
+    die_reason("Unreachable");
 }
 
 #define VALIDATE_CONTROL(raw_caps, raw_policy) \
