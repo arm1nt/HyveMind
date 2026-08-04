@@ -194,7 +194,7 @@ ensure_vcpu_current(vcpu_t *vcpu)
 }
 
 int
-vmx_init_vcpu(vcpu_t *vcpu)
+vmx_vcpu_allocate(vcpu_t *vcpu)
 {
     int res;
     phys_addr_t vmcs_ptr;
@@ -248,6 +248,15 @@ sanitize_cr0_for_vmx_operation(cr0_t *cr0)
                 cr0->raw
         );
     }
+}
+
+static inline void
+sanitize_cr3_for_vmx_operation(cr3_t *cr3)
+{
+    cr3->cr3_64b.ignored0 = 0;
+    cr3->cr3_64b.ignored1 = 0;
+    cr3->cr3_64b.reserved0 = 0;
+    cr3->cr3_64b.reserved1 = 0;
 }
 
 static inline void
@@ -308,6 +317,11 @@ enter_vmx_operation(void)
     int res;
     phys_addr_t vmxon_region;
     logical_processor_t *current = get_current_logical_processor();
+
+    if ((res = init_vmx_capabilities()) != 0) {
+        pr_error("Failed to initialize the vmx capability info");
+        return false;
+    }
 
     vmxon_region = create_vmxon_region();
     if (!vmxon_region) {
