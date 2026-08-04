@@ -363,307 +363,105 @@ leave_vmx_operation(void)
     pr_info("Successfully left VMX operation");
 }
 
-enum vmx_status_code {
-    VMX_SUCCESS,
-
-    VMX_CTLS_VALUE_UNCHANGED,
-    VMX_CTLS_VALUE_CHANGED,
-    VMX_CTLS_NOT_SUPPORTED,
-};
-
-#define RESERVED_X_CTLS_STATUS(curr, prev) \
-    (((curr) != (prev)) ? VMX_CTLS_VALUE_CHANGED : VMX_CTLS_VALUE_UNCHANGED)
-
-static inline int
-set_reserved_pinbased_ctls(vmcs_pin_ctls *ctls)
+static inline void
+setup_host_ctrl_registers(void)
 {
-    const uint32_t prev_ctls = ctls->raw;
+    cr0_t cr0;
+    cr3_t cr3;
+    cr4_t cr4;
 
-    const uint64_t pinbased_msr = get_pinbased_ctls_msr();
-    const uint32_t allowed0 = U64_LOWER32(pinbased_msr);
-    const uint32_t allowed1 = U64_UPPER32(pinbased_msr);
+    cr0.raw = read_cr0();
+    cr0.pg = 1;
+    cr0.pe = 1;
+    cr0.wp = 1;
+    sanitize_cr0_for_vmx_operation(&cr0);
+    vmwrite(HOST_CR0, cr0.raw);
 
-    ctls->raw = (ctls->raw | allowed0) & allowed1;
+    cr3.cr3_64b.raw = read_cr3();
+    sanitize_cr3_for_vmx_operation(&cr3);
+    vmwrite(HOST_CR3, cr3.cr3_64b.raw);
 
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_pinbased_ctls_default1(vmcs_pin_ctls *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    ctls->raw |= VMCS_PIN_BASED_CTLS_DEFAULT1;
-    set_reserved_pinbased_ctls(ctls);
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_procbased_ctls1(vmcs_procbased_ctls1 *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    const uint64_t procbased_msr = get_procbased_ctls1_msr();
-    const uint32_t allowed0 = U64_LOWER32(procbased_msr);
-    const uint32_t allowed1 = U64_UPPER32(procbased_msr);
-
-    ctls->raw = (ctls->raw | allowed0) &allowed1;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_procbased_ctls1_default1(vmcs_procbased_ctls1 *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    ctls->raw |= VMCS_PROCBASED_CTLS1_DEFAULT1;
-    set_reserved_procbased_ctls1(ctls);
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_procbased_ctls2(vmcs_procbased_ctls2 *ctls)
-{
-    if (!vmcs_procbased_ctls2_supported()) {
-        ctls->raw = 0;
-        return VMX_CTLS_NOT_SUPPORTED;
-    }
-
-    const uint32_t prev_ctls = ctls->raw;
-    const uint64_t procbased_msr = get_procbased_ctls2_msr();
-    const uint32_t allowed1 = U64_UPPER32(procbased_msr);
-
-    ctls->raw &= allowed1;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_procbased_ctls3(vmcs_procbased_ctls3 *ctls)
-{
-    if (!vmcs_procbased_ctls3_supported()) {
-        ctls->raw = 0;
-        return VMX_CTLS_NOT_SUPPORTED;
-    }
-
-    const uint64_t prev_ctls = ctls->raw;
-    const uint64_t procbased_msr = get_procbased_ctls3_msr();
-    ctls->raw &= procbased_msr;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_vm_exit_ctls1(vmcs_exit_ctls1 *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    const uint64_t exit_msr = get_vmexit_ctls1_msr();
-    const uint32_t allowed0 = U64_LOWER32(exit_msr);
-    const uint32_t allowed1 = U64_UPPER32(exit_msr);
-
-    ctls->raw = (ctls->raw | allowed0) & allowed1;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_vm_exit_ctls1_default1(vmcs_exit_ctls1 *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    ctls->raw |= VMCS_EXIT_CTLS1_DEFAULT1;
-    set_reserved_vm_exit_ctls1(ctls);
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_vm_exit_ctls2(vmcs_exit_ctls2 *ctls)
-{
-    if (!vmcs_vmexit_ctls2_supported()) {
-        ctls->raw = 0;
-        return VMX_CTLS_NOT_SUPPORTED;
-    }
-
-    const uint64_t prev_ctls = ctls->raw;
-    const uint64_t exit_msr = get_vmexit_ctls2_msr();
-    ctls->raw &= exit_msr;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_vm_entry_ctls(vmcs_entry_ctls *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    const uint64_t entry_msr = get_vmentry_ctls_msr();
-    const uint32_t allowed0 = U64_LOWER32(entry_msr);
-    const uint32_t allowed1 = U64_UPPER32(entry_msr);
-
-    ctls->raw = (ctls->raw | allowed0) & allowed1;
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-static inline int
-set_reserved_vm_entry_ctls_default1(vmcs_entry_ctls *ctls)
-{
-    const uint32_t prev_ctls = ctls->raw;
-
-    ctls->raw |= VMCS_ENTRY_CTLS_DEFAULT1;
-    set_reserved_vm_entry_ctls(ctls);
-
-    return RESERVED_X_CTLS_STATUS(ctls->raw, prev_ctls);
-}
-
-/**
- * Here we only check whether every the value of every field is theoretically
- * allowed, but we don't check whether the configuration makes sense (e.g.
- * we don't check that 'enable ept' is set when 'unrestricted guest' is set.
- */
-int
-vmx_validate_virt_policy(const vcpu_t *vcpu)
-{
-    struct vmx_virt_policy *policy = vcpu->arch.hw.vmx.virt_policy;
-
-    NOT_YET_IMPLEMENTED;
-}
-
-void
-vmx_init_default_policy(struct vmx_virt_policy *policy)
-{
-    memset(policy, 0, sizeof(struct vmx_virt_policy));
-
-    set_reserved_pinbased_ctls_default1(&policy->pin_ctls);
-
-    set_reserved_procbased_ctls1_default1(&policy->proc_ctls1);
-    /* procbased ctls 2&3 are per default all 0 */
-
-    set_reserved_vm_exit_ctls1_default1(&policy->exit_ctls1);
-    /* vmexit ctls2 is per default all 0 */
-
-    set_reserved_vm_entry_ctls_default1(&policy->entry_ctls);
-}
-
-void
-vmx_unpaged_pm_guest_policy(struct vmx_virt_policy *policy)
-{
-    pr_info("configuring policy for a unpaged pm guest");
-    NOT_YET_IMPLEMENTED;
-}
-
-void
-vmx_64bit_mode_guest_policy(struct vmx_virt_policy *policy)
-{
-    pr_info("Configuring policy for a long mode guest");
-    NOT_YET_IMPLEMENTED;
+    cr4.raw = read_cr4();
+    cr4.pae = 1;
+    sanitize_cr4_for_vmx_operation(&cr4);
+    vmwrite(HOST_CR4, cr4.raw);
 }
 
 static inline void
-setup_host_ctrl_registers(vcpu_t *vcpu)
-{
-    NOT_YET_IMPLEMENTED;
-}
-
-static int
-setup_host_cs(void)
-{
-    const segment_selector_t cs = DEFINE_SEGMENT_SELECTOR(HYVEMIND_CS_SEGMENT_INDEX, TI_GDT, 0);
-    const uint16_t cs_raw = *((uint16_t *) & cs);
-
-    if (cs_raw == 0) {
-        pr_warn("Host CS selector is 0x00");
-        return -1;
-    }
-
-    vmwrite(HOST_CS_SELECTOR, cs_raw);
-    return 0;
-}
-
-static int
-setup_host_tr(void)
-{
-    const segment_selector_t host_tr = read_task_register();
-    const uint16_t raw_host_tr = *((uint16_t *) &host_tr);
-
-    if (raw_host_tr == 0) {
-        pr_warn("Host TR selector is 0x00");
-        return -1;
-    }
-
-    vmwrite(HOST_TR_SELECTOR, U64(raw_host_tr));
-    return 0;
-}
-
-static inline int
 setup_host_segment_registers(void)
 {
-    int ret;
+    const segment_selector_t cs = read_cs_register();
+    const segment_selector_t tr = read_task_register();
 
-    ret = setup_host_cs();
-    if (ret != 0) {
-        pr_error("Failed to set cs selector of host");
-        return ret;
-    }
-
-    ret = setup_host_tr();
-    if (ret != 0) {
-        pr_error("Failed to set tr selector of host");
-        return ret;
-    }
-
+    vmwrite(HOST_CS_SELECTOR, *((uint16_t *) &cs));
+    vmwrite(HOST_TR_SELECTOR, *((uint16_t *) &tr));
     vmwrite(HOST_SS_SELECTOR, 0);
     vmwrite(HOST_DS_SELECTOR, 0);
     vmwrite(HOST_ES_SELECTOR, 0);
     vmwrite(HOST_FS_SELECTOR, 0);
     vmwrite(HOST_GS_SELECTOR, 0);
+}
+
+static inline void
+setup_host_system_tables(void)
+{
+    vmwrite(HOST_GDTR_BASE, read_gdtr().base);
+    vmwrite(HOST_IDTR_BASE, read_idtr().base);
+    vmwrite(HOST_TR_BASE, get_current_tss_base());
+}
+
+extern void asm_vmx_exit_handler(void);
+
+static int
+setup_exit_handler(void)
+{
+    const int nr_handler_stack_pages = 10;
+    virt_addr_t stack_bot, exit_handler_rsp_val;
+    const virt_addr_t exit_handler_addr = __vaddr(asm_vmx_exit_handler);
+
+    if (!is_paging_canonical(exit_handler_addr)) {
+        pr_error("Exit handler function addr is not canonical: %lx", exit_handler_addr);
+        return -1;
+    }
+
+    vmwrite(HOST_RIP, exit_handler_addr);
+
+    if (get_pages_zeroed(nr_handler_stack_pages, &stack_bot) != 0) {
+        pr_error("Failed to allocate '%ld' pages for the exit handler stack",
+                nr_handler_stack_pages
+        );
+        return -1;
+    }
+
+    exit_handler_rsp_val = (stack_bot + (nr_handler_stack_pages * PAGE_SIZE)) - 8;
+    if (!is_paging_canonical(exit_handler_rsp_val)) {
+        pr_error("exit handler RSP address is not canonical: %lx", exit_handler_rsp_val);
+        return -1;
+    }
+
+    vmwrite(HOST_RSP, exit_handler_rsp_val);
 
     return 0;
 }
 
-static inline int
-setup_host_system_tables(void)
-{
-    NOT_YET_IMPLEMENTED;
-}
-
 static int
-setup_exit_handler(vcpu_t *vcpu)
-{
-    NOT_YET_IMPLEMENTED;
-}
-
-int
-vmx_configure_host_state(vcpu_t *vcpu)
+__vmx_initialize_host_state(vcpu_t *vcpu)
 {
     int ret;
 
-    ensure_vcpu_current(vcpu);
-
-    setup_host_ctrl_registers(vcpu);
+    setup_host_ctrl_registers();
 
     vmwrite(HOST_IA32_SYSENTER_ESP, 0);
     vmwrite(HOST_IA32_SYSENTER_EIP, 0);
 
-    ret = setup_host_segment_registers();
-    if (ret != 0) {
-        pr_error("Error setting up host segment registers");
-        return ret;
-    }
+    setup_host_segment_registers();
 
-    ret = setup_host_system_tables();
-    if (ret != 0) {
-        pr_error("Error setting up host system tables");
-        return ret;
-    }
+    vmwrite(HOST_FS_BASE, 0);
+    vmwrite(HOST_GS_BASE, 0);
 
-    ret = setup_exit_handler(vcpu);
-    if (ret != 0) {
+    setup_host_system_tables();
+
+    if ((ret = setup_exit_handler()) != 0) {
         pr_error("Error configuring the vm exit handler");
         return ret;
     }
