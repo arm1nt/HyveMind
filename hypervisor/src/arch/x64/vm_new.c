@@ -1,183 +1,156 @@
 #include "fatal.h"
 #include "halloc.h"
 #include "printf.h"
-#include "string.h"
 #include "vm.h"
+#include "vmx/policy.h"
 #include "vmx/vmx.h"
 
+extern void vm_entry_test(void);
+
 static inline void
-reset_vcpu_seg_regs_to_processor_init_state(vcpu_t *vcpu)
+init_default_virt_policy(struct vmx_virt_policy *policy)
 {
-    struct vcpu_segments *segments = &vcpu->arch.state.segments;
-
-    vmcs_ar_t cs_ar;
-    cs_ar.raw = 0;
-    cs_ar.present = SEGMENT_PRESENT;
-    cs_ar.descriptor_type = CODE_DATA_SEGMENT_DESC;
-    cs_ar.segment_type = CODE_EXECUTE_READ_ACCESSED;
-
-    segments->cs = DEFINE_VCPU_SEG(0xF000, 0xFFFF0000, 0xFFFF, cs_ar);
-
-    vmcs_ar_t seg_ar;
-    seg_ar.raw = 0;
-    seg_ar.present = SEGMENT_PRESENT;
-    seg_ar.descriptor_type = CODE_DATA_SEGMENT_DESC;
-    seg_ar.segment_type = DATA_RW_ACCESSED;
-
-    segments->ss = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
-    segments->ds = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
-    segments->es = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
-    segments->fs = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
-    segments->gs = DEFINE_VCPU_SEG(0, 0, 0xFFFF, seg_ar);
-
-    vmcs_ar_t ldtr_ar;
-    ldtr_ar.raw = 0;
-    ldtr_ar.present = SEGMENT_PRESENT;
-    ldtr_ar.descriptor_type = SYSTEM_SEGMENT_DESC;
-    ldtr_ar.segment_type = IA32E_LDT;
-
-    segments->ldtr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, ldtr_ar);
-
-    vmcs_ar_t tr_ar;
-    tr_ar.raw = 0;
-    tr_ar.present = SEGMENT_PRESENT;
-    tr_ar.descriptor_type = SYSTEM_SEGMENT_DESC;
-    tr_ar.segment_type = IA32E_TSS_BUSY;
-
-    segments->tr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, tr_ar);
+    vmx_init_default_policy(policy);
 }
 
-static void
-reset_vcpu_to_processor_init_state(vcpu_t *vcpu)
+static int
+set_guest_info(vcpu_t *vcpu, struct vcpu_guest_arch_state *state)
 {
-    vcpu->arch.state.cpu_mode = REAL_MODE_16B;
+    vcpu->arch.state.user_regs = state->uregs;
 
-    cr0_t user_cr0;
-    user_cr0.raw = 0;
-    user_cr0.et = 1;
-    user_cr0.cd = 1;
-    user_cr0.nw = 1;
-    vcpu->arch.state.cr0 = user_cr0;
+    vmx_set_guest_cr0(vcpu, state->cr0);
+    vmx_set_guest_cr3(vcpu, state->cr3);
+    vmx_set_guest_cr4(vcpu, state->cr4);
 
-    cr3_t user_cr3;
-    user_cr3.cr3_64b.raw = 0;
-    vcpu->arch.state.cr3 = user_cr3;
+    vmx_set_segment_register(vcpu, X86_CS_REG, state->segments.cs);
+    vmx_set_segment_register(vcpu, X86_SS_REG, state->segments.ss);
+    vmx_set_segment_register(vcpu, X86_DS_REG, state->segments.ds);
+    vmx_set_segment_register(vcpu, X86_ES_REG, state->segments.es);
+    vmx_set_segment_register(vcpu, X86_FS_REG, state->segments.fs);
+    vmx_set_segment_register(vcpu, X86_GS_REG, state->segments.gs);
+    vmx_set_segment_register(vcpu, X86_TR_REG, state->segments.tr);
+    vmx_set_segment_register(vcpu, X86_LDTR_REG, state->segments.ldtr);
 
-    cr4_t user_cr4;
-    user_cr4.raw = 0;
-    vcpu->arch.state.cr4 = user_cr4;
+    vmx_set_system_table(vcpu, X86_GDT, state->gdtr);
+    vmx_set_system_table(vcpu, X86_IDT, state->idtr);
 
-    vcpu->arch.state.dr7 = 0x400;
-
-    ia32_efer_t efer;
-    efer.raw = 0;
-    vcpu->arch.state.efer = efer;
-
-    struct vcpu_user_regs *user_regs = &vcpu->arch.state.user_regs;
-    memset(user_regs, 0, sizeof(struct vcpu_user_regs));
-
-    user_regs->eflags = 0x02;
-    user_regs->eip = 0xFFF0;
-    user_regs->ebp = 0;
-    user_regs->esp = 0;
-
-    reset_vcpu_seg_regs_to_processor_init_state(vcpu);
-
-    struct vcpu_sys_table sys_table = {
-        .base = 0,
-        .limit = 0xFFFF
-    };
-
-    vcpu->arch.state.gdtr = sys_table;
-    vcpu->arch.state.idtr = sys_table;
+    return 0;
 }
 
-static void
-state_init_unpaged_protected_mode(vcpu_t *vcpu)
+static int
+init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
 {
-    NOT_YET_IMPLEMENTED;
+    int ret;
+    vcpu_t *bsp, *ap;
+    struct vmx_virt_policy *policy;
+    struct vcpu_guest_arch_state vcpu_guest_state;
+
+    bsp = vm->vcpus[0];
+    policy = bsp->arch.hw.vmx.virt_policy;
+
+    init_default_virt_policy(policy);
+    policy->entry_ctls.ia32e_mode_guest = 1;
+    policy->exit_ctls1.host_addr_space_size = 1;
+
+    if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
+        pr_error("Configured virt policy cannot be realized");
+        return -1;
+    }
+
+    if ((ret = vmx_initialize_vmcs_area(bsp)) != 0) {
+        pr_error("Failed to initialize vcpu's VMCS area: %lu", U64(ret));
+        return ret;
+    }
+
+    vcpu_guest_mirror_current_cpu(&vcpu_guest_state);
+
+    if ((ret = vcpu_guest_allocate_stack(&vcpu_guest_state, DEFAULT_VCPU_STACK_PAGES)) != 0) {
+        pr_error("Failed to allocate stack for vcpu guest");
+        return ret;
+    }
+
+    vcpu_guest_state.uregs.rip = __vaddr(vm_entry_test);
+
+    if ((ret = set_guest_info(bsp, &vcpu_guest_state)) != 0) {
+        pr_error("Failed to initialize the vcpu guest state");
+        return ret;
+    }
+
+    /* remove */
+    vmx_enter_vcpu(bsp);
+
+    return 0;
 }
 
 static inline void
-mirror_host_ctrl_registers(vcpu_t *vcpu)
+configure_linux_direct_boot_32bit_policy(struct vmx_virt_policy *policy)
 {
-    NOT_YET_IMPLEMENTED;
+    init_default_virt_policy(policy);
+
+    policy->proc_ctls1.activate_secondary_controls = 1;
+    policy->proc_ctls1.msr_bitmaps = 1;
+    policy->proc_ctls2.enable_ept = 1;
+    policy->proc_ctls2.unrestricted_guest = 1;
+
+    policy->exit_ctls1.host_addr_space_size = 1;
+    policy->exit_ctls1.load_ia32_efer = 1;
+    policy->exit_ctls1.save_ia32_efer = 1;
+
+    policy->entry_ctls.load_ia32_efer = 1;
 }
 
 static int
-prepare_vm_mirroring_vmm(vcpu_t *vcpu, const struct guest_config *config)
+init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config)
 {
+    int ret;
+    vcpu_t *bsp, *ap;
+    struct vmx_virt_policy *policy;
+    struct vcpu_guest_arch_state guest_state;
+
+    bsp = vm->vcpus[0];
+    policy = bsp->arch.hw.vmx.virt_policy;
+
+    configure_linux_direct_boot_32bit_policy(policy);
+    if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
+        pr_error("Linux 32b VM setup configures an invalid virt policy: %le", U64(ret));
+        return -1;
+    }
+
     NOT_YET_IMPLEMENTED;
 }
 
-static int
-prepare_vcpu_linux_direct_boot_32bit(vcpu_t *vcpu, const struct guest_config *config)
-{
-    NOT_YET_IMPLEMENTED;
-}
-
-static int
-init_bsp_arch_vcpu(vcpu_t *vcpu, const struct guest_config *config)
+int
+arch_init_vm(struct vm *vm, const struct guest_config *config)
 {
     switch (config->guest_type) {
         case LINUX_DIRECT_BOOT_32BIT:
-            return prepare_vcpu_linux_direct_boot_32bit(vcpu, config);
+            return init_vm_linux_direct_boot_32bit(vm, config);
         case MIRROR_VMM:
-            return prepare_vm_mirroring_vmm(vcpu, config);
+            return init_vm_mirroring_vmm(vm, config);
         default:
-            pr_error("Unsupported/Unknown VM guest type configured");
+            pr_error("Unsupported VM guest type configured");
             return -1;
     }
 
     die_reason("Unreachable");
 }
 
-static int
-init_vcpu(vcpu_t *vcpu)
-{
-    int ret;
-
-    ret = vmx_init_vcpu(vcpu);
-    if (ret != 0) {
-        pr_debug("Failed to initialize the vmcs area & launch state for the vcpu");
-        return ret;
-    }
-
-    reset_vcpu_to_processor_init_state(vcpu);
-    vmx_init_default_policy(vcpu->arch.hw.vmx.virt_policy);
-
-    return 0;
-}
-
-int
-arch_init_vm(struct vm *vm, const struct guest_config *config)
-{
-    int ret;
-
-    for (unsigned int i = 0; i < vm->nr_vcpus; i++) {
-        ret = init_vcpu(vm->vcpus[i]);
-        if (ret != 0) {
-            pr_error("Failed to initialize vcpu");
-            return ret;
-        }
-    }
-
-    ret = init_bsp_arch_vcpu(vm->vcpus[0], config);
-    if (ret != 0) {
-        pr_error("Failed to init BSP vcpu");
-        return -1;
-    }
-
-    return 0;
-}
-
 int
 allocate_arch_vcpu(struct vcpu *vcpu)
 {
+    int ret;
+
     vcpu->arch.hw.vmx.virt_policy = hmalloc(sizeof(struct vmx_virt_policy));
     if (!vcpu->arch.hw.vmx.virt_policy) {
-        pr_error("Failed to allocate a virt policy struct");
+        pr_error("Failed to allocate a vmx virt policy struct!");
         return -1;
+    }
+
+    ret = vmx_vcpu_allocate(vcpu);
+    if (ret != 0) {
+        pr_debug("Failed to allocate the vmcs area for the vcpu");
+        hfree(vcpu->arch.hw.vmx.virt_policy);
+        return ret;
     }
 
     return 0;
