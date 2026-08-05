@@ -61,3 +61,25 @@ memcmp(const void *s1, const void *s2, size_t len)
     return 0;
 }
 
+int
+strcmp(const char *s1, const char *s2)
+{
+    char c1, c2;
+    int counter = 0;
+
+    while (1) {
+        c1 = s1[counter];
+        c2 = s2[counter];
+
+        if (c1 != c2) {
+            return 1;
+        }
+
+        if (c1 == '\0') {
+            return 0;
+        }
+
+        counter++;
+    }
+}
+
