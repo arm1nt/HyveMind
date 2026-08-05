@@ -223,7 +223,7 @@ vmx_vcpu_allocate(vcpu_t *vcpu)
 
     vmcs_ptr = create_new_vmcs_area();
     if (!vmcs_ptr) {
-        pr_error("vcpu initialization failed due to the failure of creating a new vmcs area");
+        pr_error("Failed to allocate a VMCS area");
         return -1;
     }
 
@@ -236,6 +236,7 @@ vmx_vcpu_allocate(vcpu_t *vcpu)
 
     vcpu->arch.active = false;
     vcpu->arch.active_processor = INVALID_PROCESSOR_ID;
+    vcpu->arch.run_status = VCPU_NOT_READY;
     vcpu->arch.hw.vmx.vmcs_ptr = vmcs_ptr;
     vcpu->arch.hw.vmx.launch_state = VMCS_LS_CLEAR;
 
@@ -570,7 +571,7 @@ static int
 __vmx_set_ldtr_segment_register(const struct vcpu_segment segment)
 {
     if (segment.access_rights.segment_unusable) {
-        return 0;
+        goto out;
     }
 
     if (segment.selector.ti) {
@@ -618,6 +619,8 @@ __vmx_set_ldtr_segment_register(const struct vcpu_segment segment)
         return -1;
     }
 
+
+out:
     WRITE_GUEST_SEGMENT_REG(LDTR, segment);
     return 0;
 }
