@@ -24,6 +24,7 @@ destroy_vm(struct vm *vm)
     pr_debug("Destroying VM '%s'", vm->name);
     destroy_vcpus(vm->vcpus, vm->nr_vcpus);
     hfree(vm->vcpus);
+    destroy_arch_vm(vm);
     hfree(vm);
 }
 
@@ -64,7 +65,7 @@ allocate_vm(const struct guest_config *config)
     vm->vcpus = (vcpu_t **) hmalloc(sizeof(vcpu_t *) * config->nr_vcpus);
     if (!vm->vcpus) {
         pr_error("Failed to allocate VM's array of vcpu pointers");
-        goto error_out;
+        goto error_out_1;
     }
 
     for (unsigned int i = 0; i < vm->nr_vcpus; i++) {
@@ -72,13 +73,15 @@ allocate_vm(const struct guest_config *config)
         if (!vm->vcpus[i]) {
             pr_error("Failed to allocate %lu-th vcpu struct", U64(i));
             destroy_vcpus(vm->vcpus, MAX(0, i-1));
-            goto error_out;
+            goto error_out_2;
         }
     }
 
     return vm;
 
-error_out:
+error_out_2:
+    hfree(vm->vcpus);
+error_out_1:
     hfree(vm);
     return NULL;
 }

@@ -15,6 +15,8 @@ struct vm {
 
     unsigned int nr_vcpus;
     vcpu_t **vcpus;
+
+    struct arch_vm arch_vm;
 };
 
 struct vm * create_vm(const struct guest_config *config);

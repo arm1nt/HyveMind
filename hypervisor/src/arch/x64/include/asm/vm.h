@@ -13,7 +13,7 @@ struct vm;
 struct vcpu;
 struct vmx_virt_policy;
 
-#define DEFAULT_VCPU_STACK_PAGES (10)
+#define DEFAULT_VCPU_STACK_PAGES 10
 
 enum vcpu_cpu_mode {
     VCPU_REAL_MODE,
@@ -35,15 +35,15 @@ struct vmx_vcpu_state {
     enum vmcs_launch_state launch_state;
     phys_addr_t vmcs_ptr;
 
+    /* todo: maybe move to vm struct instead of vcpu */
     struct vmx_virt_policy *virt_policy;
 };
 
 struct arch_vcpu {
-    /* Active on any cpu or not. Relevant for e.g. migrating vcpu */
+    /* Is vcpu active on any cpu or not. Relevant for e.g. migrating vcpu */
     bool active;
     /* Logical processor on which the vcpu is active/current */
     cpuid_t active_processor;
-
     enum vcpu_run_status run_status;
 
     struct {
@@ -71,6 +71,7 @@ int allocate_arch_vcpu(struct vcpu *vcpu);
 void destroy_arch_vcpu(struct vcpu *vcpu);
 
 int arch_init_vm(struct vm *vm, const struct guest_config *config);
+void destroy_arch_vm(struct vm *vm);
 
 void vcpu_guest_reset_to_init_state(struct vcpu_guest_arch_state *state);
 void vcpu_guest_mirror_current_cpu(struct vcpu_guest_arch_state *state);

@@ -135,6 +135,12 @@ arch_init_vm(struct vm *vm, const struct guest_config *config)
     die_reason("Unreachable");
 }
 
+void
+destroy_arch_vm(struct vm *vm)
+{
+    /* De-allocate eptp structures, bitmaps, etc. */
+}
+
 int
 allocate_arch_vcpu(struct vcpu *vcpu)
 {
