@@ -70,6 +70,12 @@ virt_addr_t get_current_tss_base(void);
 void init_new_gdt(void);
 void load_gdt(void);
 gdt_ptr_t read_gdtr(void);
+void write_gdt_entry(
+        struct gdt_struct *gdt,
+        const void *desc,
+        const unsigned int index,
+        const desc_type_t type
+);
 
 void init_shared_idt(void);
 void load_shared_idt(void);

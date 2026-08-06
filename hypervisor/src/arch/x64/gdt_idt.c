@@ -114,7 +114,7 @@ read_idtr(void)
     return idtr;
 }
 
-static inline void
+inline void
 write_gdt_entry(
         struct gdt_struct *gdt,
         const void *desc,
