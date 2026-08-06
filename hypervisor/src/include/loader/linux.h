@@ -3,10 +3,19 @@
 
 #include "hyvstdlib.h"
 
+#define LINUX_BOOT_SECTOR_SIZE 512
+
 #define SETUP_HEADER_OFFSET 0x1F1
 
 #define SETUP_HEADER_MAGIC_NUMBER       0xAA55
-#define SETUP_HEADER_MAGIC_SIGNATURE    "HdrS"
+#define SETUP_HEADER_MAGIC_SIG          "HdrS"
+#define SETUP_HEADER_MAGIC_SIG_RAW      U32(0x53726448)
+#define SETUP_HEADER_MAGIC_SIG_OFFSET   0x202
+#define SETUP_HEADER_JMP_OPCODE         0xEB
+
+/* We require att least boot protocol version 2.15 */
+#define LINUX_BOOT_MIN_PROTOCOL_VERSION     0x020F
+#define BZIMAGE_MIN_BOOT_PROTOCOL_VERSION   0x0200
 
 #define SETUP_PROTECTED_MODE_LOADED_LOW     0x10000
 #define SETUP_PROTECTED_MODE_LOADED_HIGH    0x100000
@@ -18,6 +27,8 @@
 
 #define SETUP_XLF_KERNEL_64                 (1)
 #define SETUP_XLF_CAN_BE_LOADED_ABOVE_4G    (1 << 1)
+
+#define LINUX_E820_TYPE_RAM 1
 
 /**
  * Struct for the setup header located at offset 0x1f1 in the kernel image.
@@ -53,7 +64,7 @@ struct setup_header {
     uint8_t relocatable_kernel;
     uint8_t min_alignment;
     uint16_t xloadflags;
-    uint32_t cmdldine_size;
+    uint32_t cmdline_size;
     uint32_t hardware_subarch;
     uint64_t hardware_subarch_data;
     uint32_t payload_offset;
