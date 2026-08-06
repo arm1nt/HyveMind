@@ -10,6 +10,11 @@ typedef uint64_t virt_addr_t;
 typedef uint64_t phys_addr_t;
 typedef uint64_t pfn_t;
 
+/* guest physical address */
+typedef uint64_t gpaddr;
+/* guest virtual address */
+typedef uint64_t gvaddr;
+
 #define __vaddr(x) ((virt_addr_t) (x))
 
 #endif /* _HYVEMIND_MM_TYPES_H */
