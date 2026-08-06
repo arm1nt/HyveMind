@@ -83,3 +83,14 @@ strcmp(const char *s1, const char *s2)
     }
 }
 
+size_t
+strlen(const char *s)
+{
+    size_t counter = 0;
+    while (s[counter] != '\0') {
+        counter++;
+    }
+
+    return counter;
+}
+
