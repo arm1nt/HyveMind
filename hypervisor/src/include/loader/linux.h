@@ -102,7 +102,7 @@ struct boot_params {
     struct screen_info screen_info;             /* 0x000 - 0x03F */
     struct apm_bios_info apm_bios_info;         /* 0x040 - 0x053 */
     uint8_t pad0[4];                            /* 0x054 - 0x057 */
-    uint8_t tboot_addr;                         /* 0x058 - 0x05F */
+    uint64_t tboot_addr;                        /* 0x058 - 0x05F */
     struct ist_info ist_info;                   /* 0x060 - 0x06F */
     uint64_t acpi_rsdp_addr;                    /* 0x070 - 0x077 */
     uint8_t pad1[8];                            /* 0x078 - 0x07F */
