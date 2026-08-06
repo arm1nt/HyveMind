@@ -5,6 +5,7 @@
 #include "vm.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
+#include "loader/loader.h"
 
 extern void vm_entry_test(void);
 
@@ -100,6 +101,41 @@ configure_linux_direct_boot_32bit_policy(struct vmx_virt_policy *policy)
     policy->entry_ctls.load_ia32_efer = 1;
 }
 
+int
+copy_to_vm_gpaddr(struct vm *vm, const gpaddr start, const void *data, const uint64_t size)
+{
+    if (!vm_memory_contig_range_fits(vm, start, size)) {
+        pr_error("Cannot copy to the VM as the content to be copied doesn't fit "
+                "into the VM's allocated memory!"
+        );
+        return -1;
+    }
+
+    struct vm_physical_memory vm_mem = vm->phys_mem;
+    phys_addr_t host_pa_start = vm_mem.start + start;
+
+    memcpy((void *) phys_to_virt(host_pa_start), data, size);
+    return 0;
+}
+
+inline uint64_t
+get_vm_memory_size(const struct vm *vm)
+{
+    return (vm->phys_mem.end - vm->phys_mem.start) + 1;
+}
+
+inline bool
+vm_memory_contig_range_fits(
+        const struct vm *vm,
+        const gpaddr start,
+        const uint64_t size
+) {
+    const uint64_t total_size = get_vm_memory_size(vm);
+    const gpaddr highest_addr = total_size - 1;
+
+    return start <= highest_addr && size <= total_size - start;
+}
+
 static int
 virtualize_guest_physical_memory(struct vm *vm, const struct guest_config *config)
 {
@@ -128,6 +164,8 @@ virtualize_guest_physical_memory(struct vm *vm, const struct guest_config *confi
         return -1;
     }
 
+    vm->phys_mem.start = contig_vm_mem_start;
+    vm->phys_mem.end = contig_vm_mem_start + (req_pages * PAGE_SIZE) - 1;
     vm->arch_vm.vmx.eptp = eptp;
     return 0;
 }
