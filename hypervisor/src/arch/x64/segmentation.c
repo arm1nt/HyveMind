@@ -88,26 +88,48 @@ load_segment_registers(const struct segment_regs *regs)
     );
 }
 
-inline void
-reload_tr_register(const segment_selector_t *selector)
+static inline int
+allocate_tss_ist(tss_t *tss, const enum tss_ist_index index, const uint64_t nr_stack_pages)
 {
-    asm volatile ("LTR %0" :: "m"(*selector));
+    virt_addr_t stack_bot, stack_start;
+
+    if (index == TSS_IST_NO_IST_STACK) {
+        pr_error("Index 0 does not refer to a stack");
+        return -1;
+    }
+
+    if (get_pages_zeroed(nr_stack_pages, &stack_bot) != 0) {
+        pr_error("Failed to allocate '%lu' pages for IST_%lu stack",
+                U64(nr_stack_pages),
+                U64(index)
+        );
+        return -1;
+    }
+
+    stack_start = stack_bot + (nr_stack_pages * PAGE_SIZE) - 8;
+
+    tss->ist[index - 1].low = U64_LOWER32(stack_start);
+    tss->ist[index - 1].high = U64_UPPER32(stack_start);
+
+    return 0;
 }
 
-segment_selector_t
-read_task_register(void)
+int
+init_default_tss(tss_t *tss, const unsigned int nr_stack_pages)
 {
-    segment_selector_t tss_selector;
-    asm volatile("STR %0" : "=m"(tss_selector) :: "memory");
-    return tss_selector;
-}
+    memset(tss, 0, sizeof(tss_t));
 
-segment_selector_t
-read_cs_register(void)
-{
-    segment_selector_t cs;
-    asm volatile("mov %%cs, %0" : "=m"(cs));
-    return cs;
+    if (allocate_tss_ist(tss, TSS_IST_INDEX1, nr_stack_pages) != 0) {
+        pr_error("TSS initialization failed cause of an error allocating a IST1 stack");
+        return -1;
+    }
+
+    if (allocate_tss_ist(tss, TSS_IST_INDEX2, nr_stack_pages) != 0) {
+        pr_error("TSS initialization failed cause of an error allocating a IST2 stack");
+        return -1;
+    }
+
+    return 0;
 }
 
 virt_addr_t
@@ -120,32 +142,14 @@ get_base_from_tss_descriptor(const tss_descriptor_t *desc)
     return base;
 }
 
-int
-init_default_tss(tss_t *tss, const unsigned int stack_size_pages)
+static inline void
+set_tss_desc_limit(tss_descriptor_t *desc, const uint32_t limit)
 {
-    memset(tss, 0, sizeof(tss_t));
-
-    virt_addr_t vaddr;
-    if (get_pages_zeroed(stack_size_pages, &vaddr) != 0) {
-        return -1;
-    }
-
-    /* Since SP grows downward */
-    vaddr = align_down(vaddr + (stack_size_pages * PAGE_SIZE), 8);
-
-    tss->ist1_low = U64_LOWER32(vaddr);
-    tss->ist1_high = U64_UPPER32(vaddr);
-    return 0;
+    desc->limit0 = limit & 0xFFFF;
+    desc->limit1 = (limit >> 16) & 0xF;
 }
 
-void
-set_tss_desc_limit(tss_descriptor_t *desc, const unsigned int limit)
-{
-    desc->limit0 = limit & ((1 << 16) - 1);
-    desc->limit1 = (limit >> 16) & ((1 << 8) - 1);
-}
-
-void
+static void
 set_tss_desc_base(tss_descriptor_t *desc, const virt_addr_t base)
 {
     const uint32_t lower32 = U64_LOWER32(base);
@@ -159,7 +163,7 @@ set_tss_desc_base(tss_descriptor_t *desc, const virt_addr_t base)
 }
 
 tss_descriptor_t
-create_tss_desc(const tss_t *tss_segment, const unsigned int dpl)
+create_tss_desc(const tss_t *tss_segment, const uint8_t dpl)
 {
     tss_descriptor_t tss_desc;
     memset(&tss_desc, 0, sizeof(tss_descriptor_t));

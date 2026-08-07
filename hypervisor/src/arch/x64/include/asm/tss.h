@@ -1,6 +1,7 @@
 #ifndef _HYVEMIND_X64_ASM_TSS_H
 #define _HYVEMIND_X64_ASM_TSS_H
 
+#include "mm_types.h"
 #include "asm/paging.h"
 
 struct tss_descriptor {
@@ -22,22 +23,25 @@ struct tss_descriptor {
 typedef struct tss_descriptor tss_descriptor_t;
 
 #define TSS_RSP_ENTRY(name) \
-    uint32_t name##_low;   \
-    uint32_t name##_high
-
-#define TSS_IST_ENTRY(name) \
-    uint32_t name##_low; \
+    uint32_t name##_low;    \
     uint32_t name##_high
 
 #define TSS_IST_DEFAULT_SIZE_PAGES  4
-enum {
-    TSS_IST_INDEX0,
+
+enum tss_ist_index {
+    TSS_IST_NO_IST_STACK,
     TSS_IST_INDEX1,
     TSS_IST_INDEX2,
     TSS_IST_INDEX3,
     TSS_IST_INDEX4,
     TSS_IST_INDEX5,
     TSS_IST_INDEX6,
+    TSS_IST_INDEX7,
+};
+
+struct tss_ist_entry {
+    uint32_t low;
+    uint32_t high;
 };
 
 struct tss {
@@ -47,13 +51,7 @@ struct tss {
     TSS_RSP_ENTRY(rsp2);
     uint32_t reserved1;
     uint32_t reserved2;
-    TSS_IST_ENTRY(ist1);
-    TSS_IST_ENTRY(ist2);
-    TSS_IST_ENTRY(ist3);
-    TSS_IST_ENTRY(ist4);
-    TSS_IST_ENTRY(ist5);
-    TSS_IST_ENTRY(ist6);
-    TSS_IST_ENTRY(ist7);
+    struct tss_ist_entry ist[7];
     uint32_t reserved3;
     uint32_t reserved4;
     uint16_t reserved5;
@@ -62,11 +60,12 @@ struct tss {
 typedef struct tss tss_t;
 
 #undef TSS_RSP_ENTRY
-#undef TSS_IST_ENTRY
 
 int init_default_tss(tss_t *tss, const unsigned int stack_size_pages);
 
-tss_descriptor_t create_tss_desc(const tss_t *tss_segment, const unsigned int dpl);
+tss_descriptor_t create_tss_desc(const tss_t *tss_segment, const uint8_t dpl);
+
+virt_addr_t get_base_from_tss_descriptor(const tss_descriptor_t *desc);
 
 #endif /* _HYVEMIND_X64_ASM_TSS_H */
 
