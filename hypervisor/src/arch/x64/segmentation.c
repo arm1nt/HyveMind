@@ -1,13 +1,80 @@
+#include "fatal.h"
 #include "types.h"
 #include "string.h"
 #include "pf_alloc.h"
+#include "printf.h"
 #include "asm/segmentation.h"
 #include "asm/paging.h"
 
-extern void reload_cs_register(segment_selector_t cs_selector);
+extern void reload_cs_register(const segment_selector_t cs_selector);
+
+segment_selector_t
+read_ldtr(void)
+{
+    segment_selector_t selector;
+    asm volatile ("SLDT %0" : "=m"(selector));
+    return selector;
+}
+
+segment_selector_t
+read_task_register(void)
+{
+    segment_selector_t tss_selector;
+    asm volatile("STR %0" : "=m"(tss_selector));
+    return tss_selector;
+}
+
+#define READ_SEGMENT_REG(_reg, _selector) \
+    asm volatile ("mov %%" #_reg ", %0" : "=m"(_selector))
+
+segment_selector_t
+read_segment_register(const enum x86_segment_reg reg)
+{
+    segment_selector_t selector;
+
+    switch (reg) {
+        case X86_CS_REG:
+            READ_SEGMENT_REG(cs, selector);
+            break;
+        case X86_SS_REG:
+            READ_SEGMENT_REG(ss, selector);
+            break;
+        case X86_DS_REG:
+            READ_SEGMENT_REG(ds, selector);
+            break;
+        case X86_ES_REG:
+            READ_SEGMENT_REG(es, selector);
+            break;
+        case X86_FS_REG:
+            READ_SEGMENT_REG(fs, selector);
+            break;
+        case X86_GS_REG:
+            READ_SEGMENT_REG(gs, selector);
+            break;
+        case X86_LDTR_REG:
+            selector = read_ldtr();
+            break;
+        case X86_TR_REG:
+            selector = read_task_register();
+            break;
+        default:
+            pr_error("Cannot read unknown segment register '%lu'", U64(reg));
+            die();
+    }
+
+    return selector;
+}
+
+#undef READ_SEGMENT_REG
+
+inline void
+load_tr_register(const segment_selector_t *selector)
+{
+    asm volatile ("LTR %0" :: "m"(*selector));
+}
 
 void
-reload_segment_registers(const struct segment_regs *regs)
+load_segment_registers(const struct segment_regs *regs)
 {
     reload_cs_register(regs->cs);
 
@@ -15,8 +82,8 @@ reload_segment_registers(const struct segment_regs *regs)
             "mov %0, %%ss\n\t"
             "mov %1, %%ds\n\t"
             "mov %2, %%es\n\t"
-            "mov %2, %%fs\n\t"
-            "mov %2, %%gs\n\t"
+            "mov %3, %%fs\n\t"
+            "mov %4, %%gs\n\t"
             :: "rm"(regs->ss), "rm"(regs->ds), "rm"(regs->es), "rm"(regs->fs), "rm"(regs->gs)
     );
 }

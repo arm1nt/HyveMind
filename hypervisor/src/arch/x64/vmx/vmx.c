@@ -415,8 +415,8 @@ setup_host_ctrl_registers(void)
 static inline void
 setup_host_segment_registers(void)
 {
-    const segment_selector_t cs = read_cs_register();
-    const segment_selector_t tr = read_task_register();
+    const segment_selector_t cs = read_segment_register(X86_CS_REG);
+    const segment_selector_t tr = read_segment_register(X86_TR_REG);
 
     vmwrite(HOST_CS_SELECTOR, *((uint16_t *) &cs));
     vmwrite(HOST_TR_SELECTOR, *((uint16_t *) &tr));
@@ -917,8 +917,6 @@ __dump_vmcs(void)
 
     DUMP(VM_FUNCTION_CONTROLS);
     DUMP(INSTRUCTION_TIMEOUT_CONTROL);
-
-
 
     VMCS_DUMP_SECTION_HDR("VM-exit ctls information");
 

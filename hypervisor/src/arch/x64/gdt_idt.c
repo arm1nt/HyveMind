@@ -159,6 +159,7 @@ install_new_tss(void)
 {
     virt_addr_t tss_page;
     tss_t *tss_segment;
+    tss_descriptor_t tss_desc;
     struct gdt_struct *gdt = percpu_ptr(gdt_tables);
 
     if (get_page_zeroed(&tss_page) != 0) {
@@ -171,7 +172,8 @@ install_new_tss(void)
         pr_error("Failed to create a new TSS segment");
         return -1;
     }
-    tss_descriptor_t tss_desc = create_tss_desc(tss_segment, 0);
+
+    tss_desc = create_tss_desc(tss_segment, 0);
 
     write_gdt_entry(gdt, &tss_desc, HYVEMIND_TSS_INDEX, SYSTEM_SEGMENT_DESC);
     return 0;
@@ -202,10 +204,11 @@ load_gdt(void)
         .fs = GDT_NULL_SELECTOR,
         .gs = GDT_NULL_SELECTOR
     };
-    reload_segment_registers(&regs);
+
+    load_segment_registers(&regs);
 
     segment_selector_t tss_selector = GDT_SELECTOR(HYVEMIND_TSS_INDEX, TI_GDT, 0);
-    reload_tr_register(&tss_selector);
+    load_tr_register(&tss_selector);
 }
 
 gdt_ptr_t

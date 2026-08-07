@@ -4,6 +4,7 @@
 #include "mm_types.h"
 #include "stdint.h"
 #include "asm/tss.h"
+#include "asm/x86_defs.h"
 
 enum {
     TI_GDT = 0,
@@ -14,7 +15,7 @@ enum descriptor_type {
     SYSTEM_SEGMENT_DESC     = 0,
     CODE_DATA_SEGMENT_DESC  = 1,
 };
-typedef  enum descriptor_type desc_type_t;
+typedef enum descriptor_type desc_type_t;
 
 enum {
     SEGMENT_NOT_PRESENT = 0,
@@ -112,15 +113,13 @@ struct segment_regs {
     segment_selector_t ss;
 };
 
-void reload_segment_registers(const struct segment_regs *regs);
-
-void reload_tr_register(const segment_selector_t *selector);
 segment_selector_t read_task_register(void);
+segment_selector_t read_segment_register(const enum x86_segment_reg reg);
+
+void load_tr_register(const segment_selector_t *selector);
+void load_segment_registers(const struct segment_regs *regs);
+
 virt_addr_t get_base_from_tss_descriptor(const tss_descriptor_t *desc);
-
-segment_selector_t read_cs_register(void);
-
-int get_cpl(void);
 
 #endif /* _HYVEMIND_X64_ASM_SEGMENTATION_H */
 

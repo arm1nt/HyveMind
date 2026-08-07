@@ -41,15 +41,13 @@ mirror_segment_registers(struct vcpu_guest_arch_state *state)
     struct vcpu_segments *segments  = &state->segments;
     memset(segments, 0, sizeof(struct vcpu_segments));
 
-    segments->cs.selector = read_segment_register(SEG_CS);
+    segments->cs.selector = read_segment_register(X86_CS_REG);
     segments->tr.selector = read_task_register();
 
     segments->tr.base = get_current_tss_base();
     segments->tr.limit = U64(sizeof(tss_t) - 1);
 
-    vmcs_ar_t unusable_ar;
-    unusable_ar.raw = 0;
-    unusable_ar.segment_unusable = 1;
+    vmcs_ar_t unusable_ar = get_unusable_ar();
 
     segments->cs.access_rights = get_current_cs_ar();
     segments->ss.access_rights = unusable_ar;
