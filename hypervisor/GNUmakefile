@@ -1,14 +1,17 @@
 # Disable implicit suffix rules
 .SUFFIXES :=
 
-override NAME 	:= HyveMind
-override OUTPUT := hyvemind
+NAME 	= HyveMind
+OUTPUT  = hyvemind
 
 BUILD_TARGET_DIR_NAME 	:= build
 BUILD_DEPS_DIR_NAME		:= deps
-BUILD_TARGET_DIR_PATH	= $(PWD)
+BUILD_TARGET_DIR_PATH	:= $(CURDIR)
 override BUILD_TARGET_LOCATION 	:= $(BUILD_TARGET_DIR_PATH)/$(BUILD_TARGET_DIR_NAME)
 override BUILD_DEPS_LOCATION	:= $(BUILD_TARGET_LOCATION)/$(BUILD_DEPS_DIR_NAME)
+
+PHONY := __all
+__all:
 
 ifdef QUIET
     override Q := @
@@ -16,7 +19,6 @@ else
     override Q :=
 endif
 
-# Currently we only support intel x86 64 cpus
 ARCH := x64
 override SUPPORTED_ARCHS := x64
 ifeq ($(filter $(ARCH),$(SUPPORTED_ARCHS)),)
@@ -32,6 +34,12 @@ LD := ld
 ifeq ($(filter $(LD),ld),)
     $(error '$(NAME)' requires the GNU linker. '$(LD)' is not supported!)
 endif
+
+ABS_SRC_TREE		:= $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+SRC_DIR 			:= src
+SRC_INCLUDE_DIR 	:= $(SRC_DIR)/include
+ARCH_SRC_DIR 		:= $(SRC_DIR)/arch/$(ARCH)
+ARCH_INCLUDE_DIR 	:= $(ARCH_SRC_DIR)/include/asm
 
 CFLAGS 		:= -pipe
 CPPFLAGS 	:=
@@ -79,7 +87,7 @@ override NASMFLAGS += \
 	$(patsubst -g,-g -F dwarf,$(NASMFLAGS)) \
 	-Wall
 
-ARCH_LINKER_SCRIPT := src/arch/$(ARCH)/boot/$(ARCH).lds
+ARCH_LINKER_SCRIPT := $(ARCH_SRC_DIR)/boot/$(ARCH).lds
 
 override LDFLAGS += \
 	-m elf_x86_64 \
@@ -89,16 +97,21 @@ override LDFLAGS += \
 	--gc-sections \
 	-T $(ARCH_LINKER_SCRIPT)
 
-GENERIC_HYPERVISOR_SRC_FILES := $(shell find -L src -type f -not -path 'src/arch/*' 2>/dev/null | LC_ALL=C sort)
-BUILD_ARCH_HYPERVISOR_SRC_FILES:= $(shell find -L src/arch/$(ARCH) -type f 2>/dev/null | LC_ALL=C sort)
+HYPERVISOR_SRC_FILES := $(shell find -L src -type f -not -path 'src/arch/*' 2>/dev/null | LC_ALL=C sort)
+ARCH_HYPERVISOR_SRC_FILES:= $(shell find -L src/arch/$(ARCH) -type f 2>/dev/null | LC_ALL=C sort)
 DEP_SRC_FILES_RAW := $(shell find -L $(BUILD_DEPS_LOCATION)/cc-runtime/src -type f 2>/dev/null | LC_ALL=C sort)
 DEP_SRC_FILES := $(subst $(BUILD_DEPS_LOCATION),ext-deps,$(DEP_SRC_FILES_RAW))
 
-ALL_SRC_FILES := $(GENERIC_HYPERVISOR_SRC_FILES) 	\
-				 $(BUILD_ARCH_HYPERVISOR_SRC_FILES) \
+ALL_SRC_FILES := $(HYPERVISOR_SRC_FILES) 		\
+				 $(ARCH_HYPERVISOR_SRC_FILES) 	\
 				 $(DEP_SRC_FILES)
 
-C_FILES := $(filter %.c,$(ALL_SRC_FILES))
+# Files that we only use to auto generate header files -> they shouldnt be included
+# in the final executable.
+C_AUTOGEN_SOURCES := $(ARCH_SRC_DIR)/asm-offsets.c
+C_AUTOGEN_TARGETS := $(patsubst %.c, $(ARCH_INCLUDE_DIR)/generated/%.h, $(notdir $(C_AUTOGEN_SOURCES)))
+
+C_FILES := $(filter-out %$(C_AUTOGEN_SOURCES), $(filter %.c,$(ALL_SRC_FILES)))
 GNU_AS_FILES := $(filter %.S,$(ALL_SRC_FILES))
 NASM_FILES := $(filter %.asm,$(ALL_SRC_FILES))
 
@@ -114,15 +127,28 @@ HEADER_DEPS = $(addprefix $(OBJ_PREFIX),$(C_FILES:.c=.c.d) $(GNU_AS_FILES:.S=.S.
 # Search for (targets &) prerequisites in the deps folder too
 VPATH += $(BUILD_DEPS_LOCATION)/
 
-PHONY := all
-all:
-	$(Q)$(MAKE) install_build_dependencies
-	$(Q)$(MAKE) build_hypervisor
+__all: all
+
+PHONY += all
+all: install_build_dependencies build_hypervisor
 
 PHONY += build_hypervisor
-build_hypervisor: $(BUILD_TARGET_LOCATION)/bin-$(ARCH)/$(OUTPUT)
+build_hypervisor: prepare $(BUILD_TARGET_LOCATION)/bin-$(ARCH)/$(OUTPUT)
 
 -include $(HEADER_DEPS)
+
+PHONY += prepare
+prepare: prepare_gen_headers
+
+prepare_gen_headers: $(C_AUTOGEN_TARGETS)
+
+$(OBJ_PREFIX)%.S: $(ARCH_SRC_DIR)/%.c
+	$(Q)mkdir -p "$(dir $@)"
+	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -S -o $@
+
+$(C_AUTOGEN_TARGETS): $(ARCH_INCLUDE_DIR)/generated/%.h: $(OBJ_PREFIX)%.S
+	$(Q)mkdir -p "$(dir $@)"
+	$(Q)../scripts/gen_header_from_c_source.sh $(notdir $@) $(ABS_SRC_TREE) $< $(patsubst %/, %, $(dir $@))
 
 $(BUILD_TARGET_LOCATION)/bin-$(ARCH)/$(OUTPUT): GNUmakefile $(ARCH_LINKER_SCRIPT) $(OBJS)
 	$(Q)mkdir -p "$(dir $@)"
@@ -172,12 +198,13 @@ PHONY += clean
 clean:
 	$(Q)echo "Removing build artifacts..."
 	$(Q)rm -rf $(BUILD_TARGET_LOCATION)/bin-$(ARCH) $(BUILD_TARGET_LOCATION)/obj-$(ARCH)
+	$(Q)rm -rf $(ARCH_INCLUDE_DIR)/generated/
 
 PHONY += distclean
-distclean:
+distclean: clean
 	$(Q)rm -rf $(BUILD_TARGET_LOCATION)
 	$(Q)rm -rf .cache/
 	$(Q)rm -rf compile_commands.json
 
-.PHONY = $(PHONY)
+.PHONY: $(PHONY)
 
