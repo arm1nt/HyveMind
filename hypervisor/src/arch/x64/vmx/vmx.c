@@ -427,14 +427,16 @@ setup_host_segment_registers(void)
     vmwrite(HOST_GS_SELECTOR, 0);
 }
 
-extern void asm_vmx_exit_handler(void);
+void asm_vmx_vm_exit_handler(struct vcpu_user_regs *regs);
 
 static int
 setup_exit_handler(void)
 {
+    const vcpu_t *vcpu = current_vcpu;
+    const struct vcpu_user_regs *regs = &vcpu->arch.state.user_regs;
     const int nr_handler_stack_pages = 10;
     virt_addr_t stack_bot, exit_handler_rsp_val;
-    const virt_addr_t exit_handler_addr = __vaddr(asm_vmx_exit_handler);
+    const virt_addr_t exit_handler_addr = __vaddr(asm_vmx_vm_exit_handler);
 
     if (!is_paging_canonical(exit_handler_addr)) {
         pr_error("Exit handler function addr is not canonical: %lx", exit_handler_addr);
@@ -450,7 +452,18 @@ setup_exit_handler(void)
         return -1;
     }
 
+    /**
+     * We copy pointers to the vcpu and the vcpu_user_regs struct above the
+     * rsp that will be loaded on a vm exit. I.e.
+     * | vcpu ptr |
+     * | regs ptr |
+     * | host rsp |
+     */
     exit_handler_rsp_val = (stack_bot + (nr_handler_stack_pages * PAGE_SIZE)) - 8;
+    memcpy((void *)exit_handler_rsp_val, &vcpu, 8);
+    exit_handler_rsp_val -= 8;
+    memcpy((void *) exit_handler_rsp_val, &regs, 8);
+
     if (!is_paging_canonical(exit_handler_rsp_val)) {
         pr_error("exit handler RSP address is not canonical: %lx", exit_handler_rsp_val);
         return -1;
