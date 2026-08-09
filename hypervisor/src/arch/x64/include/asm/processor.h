@@ -81,6 +81,16 @@ read_efer(void)
     return efer;
 }
 
+#define ACCESS_DEBUG_REGISTER(reg)                          \
+    static inline uint64_t read_##reg(void) {               \
+        uint64_t val;                                       \
+        asm volatile ("movq %%" #reg ", %0" : "=r"(val));   \
+        return val;                                         \
+    }
+
+ACCESS_DEBUG_REGISTER(dr7)
+#undef ACCESS_DEBUG_REGISTER
+
 DECLARE_PER_CPU(uint32_t, cpuid_range_base);
 DECLARE_PER_CPU(uint32_t, cpuid_max_leaf);
 DECLARE_PER_CPU(uint32_t, cpuid_extended_range_base);
