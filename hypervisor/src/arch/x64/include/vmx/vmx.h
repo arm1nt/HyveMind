@@ -6,6 +6,10 @@
 
 void tag_region_with_vmx_revisionid(const phys_addr_t region);
 
+cr0_t sanitize_cr0_for_vmx_operation(const cr0_t cr0);
+cr3_t sanitize_cr3_for_vmx_operation(cr3_t cr3);
+cr4_t sanitize_cr4_for_vmx_operation(const cr4_t cr4);
+
 bool enter_vmx_operation(void);
 void leave_vmx_operation(void);
 

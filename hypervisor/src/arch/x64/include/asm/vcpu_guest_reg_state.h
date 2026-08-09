@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H
-#define _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H
+#ifndef _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
+#define _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
 
 #include "hyvstdlib.h"
 #include "asm/segmentation.h"
@@ -77,7 +77,7 @@ struct vcpu_segments {
     struct vcpu_segment tr;
 };
 
-struct vcpu_guest_arch_state {
+struct vcpu_guest_reg_state {
     cr0_t cr0;
     cr3_t cr3;
     cr4_t cr4;
@@ -90,5 +90,9 @@ struct vcpu_guest_arch_state {
     struct vcpu_sys_table idtr;
 };
 
-#endif /* _HYVEMIND_X64_ASM_VCPU_ARCH_STATE_H */
+void reset_guest_reg_state_to_init_state(struct vcpu_guest_reg_state *state);
+void init_guest_reg_state_mirroring_host(struct vcpu_guest_reg_state *state);
+void init_guest_reg_state_for_linux_32bit(struct vcpu_guest_reg_state *state);
+
+#endif /* _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H */
 

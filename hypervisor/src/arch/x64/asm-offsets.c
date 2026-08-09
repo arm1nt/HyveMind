@@ -1,5 +1,5 @@
 #include "asm/vm.h"
-#include "asm/vcpu_arch_state.h"
+#include "asm/vcpu_guest_reg_state.h"
 
 #define DEFINE_ASM_OFFSET(sym, offset)  \
     asm volatile("\n.ascii \"-->> #define " #sym " %c0 \"\n" :: "i" (offset))

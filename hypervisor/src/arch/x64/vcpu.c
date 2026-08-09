@@ -1,87 +1,21 @@
-#include "pf_alloc.h"
-#include "printf.h"
-#include "vm.h"
+#include "string.h"
+#include "asm/vcpu_guest_reg_state.h"
 #include "asm/gdt_idt.h"
 #include "asm/segmentation.h"
-
-static inline void
-mirror_ctrl_registers(struct vcpu_guest_arch_state *state)
-{
-    state->cr0.raw = read_cr0();
-    state->cr3.cr3_64b.raw = read_cr3();
-    state->cr4.raw = read_cr4();
-}
+#include "vmx/vmcs.h"
+#include "vmx/vmx.h"
 
 static inline vmcs_ar_t
-get_current_tr_ar(void)
+get_unusable_ar(void)
 {
-    vmcs_ar_t ar;
-    ar.raw = 0;
-    ar.segment_type = IA32E_TSS_BUSY;
-    ar.descriptor_type = SYSTEM_SEGMENT_DESC;
-    ar.present = SEGMENT_PRESENT;
-    return ar;
-}
-
-static inline vmcs_ar_t
-get_current_cs_ar(void)
-{
-    vmcs_ar_t ar;
-    ar.raw = 0;
-    ar.segment_type = CODE_EXECUTE_ONLY_ACCESSED;
-    ar.descriptor_type = CODE_DATA_SEGMENT_DESC;
-    ar.present = SEGMENT_PRESENT;
-    ar.l = 1;
-    return ar;
+    vmcs_ar_t unusable_ar;
+    unusable_ar.raw = 0;
+    unusable_ar.segment_unusable = 1;
+    return unusable_ar;
 }
 
 static inline void
-mirror_segment_registers(struct vcpu_guest_arch_state *state)
-{
-    struct vcpu_segments *segments  = &state->segments;
-    memset(segments, 0, sizeof(struct vcpu_segments));
-
-    segments->cs.selector = read_segment_register(X86_CS_REG);
-    segments->tr.selector = read_task_register();
-
-    segments->tr.base = get_current_tss_base();
-    segments->tr.limit = U64(sizeof(tss_t) - 1);
-
-    vmcs_ar_t unusable_ar = get_unusable_ar();
-
-    segments->cs.access_rights = get_current_cs_ar();
-    segments->ss.access_rights = unusable_ar;
-    segments->ds.access_rights = unusable_ar;
-    segments->es.access_rights = unusable_ar;
-    segments->fs.access_rights = unusable_ar;
-    segments->gs.access_rights = unusable_ar;
-    segments->tr.access_rights = get_current_tr_ar();
-    segments->ldtr.access_rights = unusable_ar;
-}
-
-void
-vcpu_guest_mirror_current_cpu(struct vcpu_guest_arch_state *state)
-{
-    mirror_ctrl_registers(state);
-    state->dr7 = 0;
-    state->efer = read_efer();
-
-    memset(&state->uregs, 0, sizeof(struct vcpu_user_regs));
-    state->uregs.rflags = 0x02;
-
-    mirror_segment_registers(state);
-
-    const gdt_ptr_t gdtr = read_gdtr();
-    const idt_ptr_t idtr = read_idtr();
-
-    state->gdtr.base = gdtr.base;
-    state->gdtr.limit = gdtr.limit;
-    state->idtr.base = idtr.base;
-    state->idtr.limit = idtr.limit;
-}
-
-static inline void
-vcpu_guest_reset_segments_to_init_state(struct vcpu_guest_arch_state *state)
+reset_segments_to_init_state(struct vcpu_guest_reg_state *state)
 {
     struct vcpu_segments *segments = &state->segments;
 
@@ -123,23 +57,22 @@ vcpu_guest_reset_segments_to_init_state(struct vcpu_guest_arch_state *state)
 }
 
 void
-vcpu_guest_reset_to_init_state(struct vcpu_guest_arch_state *state)
+reset_guest_reg_state_to_init_state(struct vcpu_guest_reg_state *state)
 {
-    state->cr0.raw = 0;
+    memset(state, 0, sizeof(struct vcpu_guest_reg_state));
+
     state->cr0.et = 1;
     state->cr0.cd = 1;
     state->cr0.nw = 1;
+    state->cr0 = sanitize_cr0_for_vmx_operation(state->cr0);
 
-    state->cr3.cr3_64b.raw = 0;
-    state->cr4.raw = 0;
+    state->cr4 = sanitize_cr4_for_vmx_operation(state->cr4);
+
     state->dr7 = 0x400;
-    state->efer.raw = 0;
-
-    memset(&state->uregs, 0, sizeof(struct vcpu_user_regs));
     state->uregs.eflags = 0x02;
     state->uregs.eip = 0xFFF0;
 
-    vcpu_guest_reset_segments_to_init_state(state);
+    reset_segments_to_init_state(state);
 
     state->gdtr.base = 0;
     state->gdtr.limit = 0xFFFF;
@@ -147,16 +80,128 @@ vcpu_guest_reset_to_init_state(struct vcpu_guest_arch_state *state)
     state->idtr.limit = 0xFFFF;
 }
 
-int
-vcpu_guest_allocate_stack(struct vcpu_guest_arch_state *state, const int nr_pages)
+static inline void
+mirror_host_ctrl_regs(struct vcpu_guest_reg_state *state)
 {
-    virt_addr_t stack_bot;
-    if (get_pages_zeroed(nr_pages, &stack_bot) != 0) {
-        pr_error("Failed to allocate '%lu' pages for the guest stack.", U64(nr_pages));
-        return -1;
-    }
+    state->cr0.raw = read_cr0();
+    state->cr3.cr3_64b.raw = read_cr3();
+    state->cr4.raw = read_cr4();
+}
 
-    state->uregs.rsp = (stack_bot + (nr_pages * PAGE_SIZE)) - 8;
-    return 0;
+static inline vmcs_ar_t
+get_current_tr_ar(void)
+{
+    vmcs_ar_t ar;
+    ar.raw = 0;
+    ar.segment_type = IA32E_TSS_BUSY;
+    ar.descriptor_type = SYSTEM_SEGMENT_DESC;
+    ar.present = SEGMENT_PRESENT;
+    return ar;
+}
+
+static inline vmcs_ar_t
+get_current_cs_ar(void)
+{
+    vmcs_ar_t ar;
+    ar.raw = 0;
+    ar.segment_type = CODE_EXECUTE_ONLY_ACCESSED;
+    ar.descriptor_type = CODE_DATA_SEGMENT_DESC;
+    ar.present = SEGMENT_PRESENT;
+    ar.l = 1;
+    return ar;
+}
+
+static inline void
+mirror_host_segment_registers(struct vcpu_guest_reg_state *state)
+{
+    struct vcpu_segments *segments = &state->segments;
+
+    segments->cs.selector = read_segment_register(X86_CS_REG);
+    segments->tr.selector = read_task_register();
+
+    segments->tr.base = get_current_tss_base();
+    segments->tr.limit = U64(sizeof(tss_t) - 1);
+
+    vmcs_ar_t unusable_ar = get_unusable_ar();
+
+    segments->cs.access_rights = get_current_cs_ar();
+    segments->ss.access_rights = unusable_ar;
+    segments->ds.access_rights = unusable_ar;
+    segments->es.access_rights = unusable_ar;
+    segments->fs.access_rights = unusable_ar;
+    segments->gs.access_rights = unusable_ar;
+    segments->tr.access_rights = get_current_tr_ar();
+    segments->ldtr.access_rights = unusable_ar;
+}
+
+void
+init_guest_reg_state_mirroring_host(struct vcpu_guest_reg_state *state)
+{
+    memset(state, 0, sizeof(struct vcpu_guest_reg_state));
+
+    mirror_host_ctrl_regs(state);
+    state->dr7 = read_dr7();
+    state->efer = read_efer();
+
+    state->uregs.rflags = 0x02;
+
+    mirror_host_segment_registers(state);
+
+    const gdt_ptr_t gdtr = read_gdtr();
+    const idt_ptr_t idtr = read_idtr();
+
+    state->gdtr.base = gdtr.base;
+    state->gdtr.limit = gdtr.limit;
+    state->idtr.base = idtr.base;
+    state->idtr.limit = idtr.limit;
+}
+
+static void
+init_segments_for_linux_32bit(struct vcpu_segments *segments)
+{
+    vmcs_ar_t tr_ar;
+    const vmcs_ar_t unusable_ar = get_unusable_ar();
+
+    segments->cs.base = 0;
+    segments->cs.limit = 0xFFFFFFFF;
+    segments->cs.raw_selector = 0x10;
+    segments->cs.access_rights.raw = 0xC09B;
+
+    segments->ds.base = 0;
+    segments->ds.limit = 0xFFFFFFFF;
+    segments->ds.raw_selector = 0x18;
+    segments->ds.access_rights.raw = 0xc093;
+
+    segments->es = segments->ds;
+    segments->ss = segments->ds;
+
+    segments->gs.access_rights = unusable_ar;
+    segments->fs.access_rights = unusable_ar;
+    segments->ldtr.access_rights = unusable_ar;
+
+    tr_ar.raw = 0;
+    tr_ar.present = SEGMENT_PRESENT;
+    tr_ar.descriptor_type = SYSTEM_SEGMENT_DESC;
+    tr_ar.segment_type = IA32E_TSS_BUSY;
+    segments->tr = DEFINE_VCPU_SEG(0, 0, 0xFFFF, tr_ar);
+}
+
+void
+init_guest_reg_state_for_linux_32bit(struct vcpu_guest_reg_state *state)
+{
+    memset(state, 0, sizeof(struct vcpu_guest_reg_state));
+
+    /**
+     * Sanitization forces pg & pe to be enabled.
+     */
+    state->cr0 = sanitize_cr0_for_vmx_operation(state->cr0);
+    state->cr0.pe = 1;
+    state->cr0.pg = 0;
+
+    state->cr4 = sanitize_cr4_for_vmx_operation(state->cr4);
+
+    state->uregs.eflags = 0x02;
+
+    init_segments_for_linux_32bit(&state->segments);
 }
 

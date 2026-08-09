@@ -4,7 +4,7 @@
 #include "guest_config.h"
 #include "mm_types.h"
 #include "asm/arch_types.h"
-#include "asm/vcpu_arch_state.h"
+#include "asm/vcpu_guest_reg_state.h"
 #include "asm/x86_defs.h"
 #include "vmx/ept.h"
 #include "vmx/vmcs.h"
@@ -72,11 +72,6 @@ void destroy_arch_vcpu(struct vcpu *vcpu);
 
 int arch_init_vm(struct vm *vm, const struct guest_config *config);
 void destroy_arch_vm(struct vm *vm);
-
-void vcpu_guest_reset_to_init_state(struct vcpu_guest_arch_state *state);
-void vcpu_guest_mirror_current_cpu(struct vcpu_guest_arch_state *state);
-int vcpu_guest_allocate_stack(struct vcpu_guest_arch_state *state, const int nr_pages);
-enum vcpu_cpu_mode get_vcpu_cpu_mode(const struct vcpu *vcpu);
 
 #endif /* _HYVEMIND_X64_ASM_VM_H */
 

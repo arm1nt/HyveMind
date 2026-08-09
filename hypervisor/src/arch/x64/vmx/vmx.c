@@ -17,7 +17,7 @@
 DEFINE_PER_CPU(vcpu_t *, curr_vcpu);
 #define current_vcpu (percpu_val(curr_vcpu))
 
-int
+static int
 ensure_vcpu_current(vcpu_t *vcpu)
 {
     if (vcpu == current_vcpu) {
@@ -101,41 +101,30 @@ vmx_destroy_vcpu(vcpu_t *vcpu)
 #define VMX_CR4_FIXED0 (read_msr(MSRX64_IA32_VMX_CR4_FIXED0))
 #define VMX_CR4_FIXED1 (read_msr(MSRX64_IA32_VMX_CR4_FIXED1))
 
-static inline void
-sanitize_cr0_for_vmx_operation(cr0_t *cr0)
+cr0_t
+sanitize_cr0_for_vmx_operation(const cr0_t cr0)
 {
-    const uint64_t old_cr0_raw = cr0->raw;
-    cr0->raw = (cr0->raw | VMX_CR0_FIXED0) & VMX_CR0_FIXED1;
-
-    if (old_cr0_raw != cr0->raw) {
-        pr_info("CR0 value changed by sanitization.\nOld: %lx\nNew: %lx",
-                old_cr0_raw,
-                cr0->raw
-        );
-    }
+    cr0_t sanitized;
+    sanitized.raw = (cr0.raw | VMX_CR0_FIXED0) & VMX_CR0_FIXED1;
+    return sanitized;
 }
 
-static inline void
-sanitize_cr3_for_vmx_operation(cr3_t *cr3)
+cr3_t
+sanitize_cr3_for_vmx_operation(cr3_t cr3)
 {
-    cr3->cr3_64b.ignored0 = 0;
-    cr3->cr3_64b.ignored1 = 0;
-    cr3->cr3_64b.reserved0 = 0;
-    cr3->cr3_64b.reserved1 = 0;
+    cr3.cr3_64b.ignored0 = 0;
+    cr3.cr3_64b.ignored1 = 0;
+    cr3.cr3_64b.reserved0 = 0;
+    cr3.cr3_64b.reserved1 = 0;
+    return cr3;
 }
 
-static inline void
-sanitize_cr4_for_vmx_operation(cr4_t *cr4)
+cr4_t
+sanitize_cr4_for_vmx_operation(const cr4_t cr4)
 {
-    const uint64_t old_cr4_raw = cr4->raw;
-    cr4->raw = (cr4->raw | VMX_CR4_FIXED0) & VMX_CR4_FIXED1;
-
-    if (old_cr4_raw != cr4->raw) {
-        pr_info("CR4 value changed by sanitization.\nOld: %lx\nNew: %lx",
-                old_cr4_raw,
-                cr4->raw
-        );
-    }
+    cr4_t sanitized;
+    sanitized.raw = (cr4.raw | VMX_CR4_FIXED0) & VMX_CR4_FIXED1;
+    return sanitized;
 }
 
 static inline void
@@ -145,11 +134,11 @@ sanitize_ctrl_regs_for_vmxon(void)
     cr4_t cr4;
 
     cr0.raw = read_cr0();
-    sanitize_cr0_for_vmx_operation(&cr0);
+    cr0 = sanitize_cr0_for_vmx_operation(cr0);
     write_cr0(cr0.raw);
 
     cr4.raw = read_cr4();
-    sanitize_cr4_for_vmx_operation(&cr4);
+    cr4 = sanitize_cr4_for_vmx_operation(cr4);
     write_cr4(cr4.raw);
 }
 
@@ -239,16 +228,16 @@ setup_host_ctrl_registers(void)
     cr0.pg = 1;
     cr0.pe = 1;
     cr0.wp = 1;
-    sanitize_cr0_for_vmx_operation(&cr0);
+    cr0 = sanitize_cr0_for_vmx_operation(cr0);
     vmwrite(HOST_CR0, cr0.raw);
 
     cr3.cr3_64b.raw = read_cr3();
-    sanitize_cr3_for_vmx_operation(&cr3);
+    cr3 = sanitize_cr3_for_vmx_operation(cr3);
     vmwrite(HOST_CR3, cr3.cr3_64b.raw);
 
     cr4.raw = read_cr4();
     cr4.pae = 1;
-    sanitize_cr4_for_vmx_operation(&cr4);
+    cr4 = sanitize_cr4_for_vmx_operation(cr4);
     vmwrite(HOST_CR4, cr4.raw);
 }
 
@@ -338,12 +327,6 @@ __vmx_initialize_host_state(void)
     }
 
     return 0;
-}
-
-int
-vmx_set_eptp(vcpu_t *vcpu)
-{
-    NOT_YET_IMPLEMENTED;
 }
 
 int
