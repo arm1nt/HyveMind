@@ -24,9 +24,19 @@ ensure_vcpu_current(vcpu_t *vcpu)
         return 0;
     }
 
+    if (vcpu->arch.active && !(vcpu->arch.active_processor == get_current_cpuid())) {
+        pr_warn("Cannot make vcpu current as its already current on another processor!"
+                "Current processor (%lu) vs. processor the vcpu is current on (%lu)",
+                U64(get_current_cpuid()),
+                U64(vcpu->arch.active_processor)
+        );
+
+        return -1;
+    }
+
     const int res = vmptrld(vcpu->arch.hw.vmx.vmcs_ptr);
     if (res != VMX_OP_SUCCESS) {
-        pr_warn("'vmptrld' in ensure_vcpu_current() failed: %lu", res);
+        pr_warn("'vmptrld' in ensure_vcpu_current() has failed: %lu", res);
         return res;
     }
 
@@ -37,18 +47,28 @@ ensure_vcpu_current(vcpu_t *vcpu)
     return 0;
 }
 
-/* TODO: improve + better error msg & handling */
 static inline int
 clear_vcpu(vcpu_t *vcpu)
 {
-    if (!(vcpu->arch.active && (vcpu->arch.active_processor == get_current_cpuid()))) {
-        pr_warn("vcpu is not active on cpu '%lu'", U64(get_current_cpuid()));
+    if (vcpu->arch.active && !(vcpu->arch.active_processor == get_current_cpuid())) {
+        pr_warn("Cannot clear a VMCS that is active on another processor! "
+                "Current processor (%lu) vs. processor the VMCS is active on (%lu)",
+                U64(get_current_cpuid()),
+                U64(vcpu->arch.active_processor)
+        );
         return -1;
+    }
+
+    if (!vcpu->arch.active) {
+        pr_debug("Clearing an already non-active vcpu");
     }
 
     vmclear(vcpu->arch.hw.vmx.vmcs_ptr);
 
-    current_vcpu = NULL;
+    if (vcpu == current_vcpu) {
+        current_vcpu = NULL;
+    }
+
     vcpu->arch.active = false;
     vcpu->arch.active_processor = INVALID_PROCESSOR_ID;
     vcpu->arch.hw.vmx.launch_state = VMCS_LS_CLEAR;
@@ -86,13 +106,27 @@ vmx_vcpu_allocate(vcpu_t *vcpu)
 void
 vmx_destroy_vcpu(vcpu_t *vcpu)
 {
-    const phys_addr_t curr_vmcs_ptr = vcpu->arch.hw.vmx.vmcs_ptr;
+    phys_addr_t *curr_vmcs_ptr = &vcpu->arch.hw.vmx.vmcs_ptr;
 
-    if ((vcpu->arch.hw.vmx.launch_state != VMCS_LS_INVALID) && curr_vmcs_ptr) {
-        vmclear(curr_vmcs_ptr);
-        free_page_raw(curr_vmcs_ptr);
-        vcpu->arch.hw.vmx.vmcs_ptr = 0;
-        vcpu->arch.hw.vmx.launch_state = VMCS_LS_INVALID;
+    if (!vcpu->arch.active) {
+        goto do_destroy;
+    }
+
+    if (vcpu->arch.active_processor == get_current_cpuid()) {
+        clear_vcpu(vcpu);
+        goto do_destroy;
+    } else {
+        pr_info("Need to execute 'clear_vcpu' on the target procesor (%lu)!",
+                U64(vcpu->arch.active_processor)
+        );
+        NOT_YET_IMPLEMENTED;
+    }
+
+do_destroy:
+
+    if (*curr_vmcs_ptr) {
+        free_page_raw(*curr_vmcs_ptr);
+        *curr_vmcs_ptr = 0;
     }
 }
 
@@ -173,7 +207,7 @@ enter_vmx_operation(void)
     logical_processor_t *current = get_current_logical_processor();
 
     if ((res = init_vmx_capabilities()) != 0) {
-        pr_error("Failed to initialize the vmx capability info");
+        pr_error("Failed to initialize the vmx capability info: %lu", U64(res));
         return false;
     }
 
@@ -256,7 +290,7 @@ setup_host_segment_registers(void)
     vmwrite(HOST_GS_SELECTOR, 0);
 }
 
-void asm_vmx_vm_exit_handler(struct vcpu_user_regs *regs);
+extern void asm_vmx_vm_exit_handler(struct vcpu_user_regs *regs);
 
 static int
 setup_exit_handler(void)
@@ -268,7 +302,7 @@ setup_exit_handler(void)
     const virt_addr_t exit_handler_addr = __vaddr(asm_vmx_vm_exit_handler);
 
     if (!is_paging_canonical(exit_handler_addr)) {
-        pr_error("Exit handler function addr is not canonical: %lx", exit_handler_addr);
+        pr_error("Exit handler function addr is not canonical: 0x%lx", exit_handler_addr);
         return -1;
     }
 
@@ -282,24 +316,26 @@ setup_exit_handler(void)
     }
 
     /**
-     * We copy pointers to the vcpu and the vcpu_user_regs struct above the
-     * rsp that will be loaded on a vm exit. I.e.
-     * | vcpu ptr |
-     * | regs ptr |
-     * | host rsp |
+     * We store pointers to the vcpu struct and the user regs struct right above
+     * the rsp so that we can save user regs etc. on a vm exit. I.e.
+     *  | vcpu ptr |
+     *  ------------
+     *  | regs ptr |
+     *  ------------ <-- host rsp that we write into the vmcs.
      */
     exit_handler_rsp_val = (stack_bot + (nr_handler_stack_pages * PAGE_SIZE)) - 8;
-    memcpy((void *)exit_handler_rsp_val, &vcpu, 8);
+    memcpy((void *) exit_handler_rsp_val, &vcpu, 8);
+
     exit_handler_rsp_val -= 8;
     memcpy((void *) exit_handler_rsp_val, &regs, 8);
 
     if (!is_paging_canonical(exit_handler_rsp_val)) {
-        pr_error("exit handler RSP address is not canonical: %lx", exit_handler_rsp_val);
+        pr_error("exit handler RSP is not canonical: 0x%lx", exit_handler_rsp_val);
+        free_pages(nr_handler_stack_pages, stack_bot);
         return -1;
     }
 
     vmwrite(HOST_RSP, exit_handler_rsp_val);
-
     return 0;
 }
 
@@ -358,6 +394,14 @@ vmx_set_guest_cr4(vcpu_t *vcpu, const cr4_t cr4)
 {
     ensure_vcpu_current(vcpu);
     vmwrite(GUEST_CR4, cr4.raw);
+    clear_vcpu(vcpu);
+}
+
+void
+vmx_set_guest_efer(vcpu_t *vcpu, const ia32_efer_t efer)
+{
+    ensure_vcpu_current(vcpu);
+    vmwrite(GUEST_IA32_EFER, efer.raw);
     clear_vcpu(vcpu);
 }
 
@@ -559,7 +603,7 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
     policy = vcpu->arch.hw.vmx.virt_policy;
     __vmx_update_ctrl_vectors(policy);
 
-    if ((ret = __vmx_initialize_host_state()) != 0) {
+    if (__vmx_initialize_host_state() != 0) {
         pr_error("Failed to initialize vmcs host state area");
         goto error_out;
     }
@@ -599,52 +643,72 @@ error_out:
     return ret;
 }
 
-extern int do_vmx_vcpu_enter(struct vcpu_user_regs regs);
+/* in vmx/entry.S */
+extern int asm_do_vmx_vcpu_entry(
+        const vcpu_t *vcpu,
+        const enum vmcs_launch_state launch_state,
+        const struct vcpu_user_regs *regs
+);
 
 bool
 __vmx_entry_helper(vcpu_t *vcpu)
 {
-    NOT_YET_IMPLEMENTED;
+    vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
+    vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
+    vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
+    return true;
 }
 
 int
 vmx_enter_vcpu(vcpu_t *vcpu)
 {
     int ret;
+    enum vmcs_launch_state launch_state = vcpu->arch.hw.vmx.launch_state;
 
-    ensure_vcpu_current(vcpu);
+    if ((ret = ensure_vcpu_current(vcpu)) != 0) {
+        pr_error("vCPU entry failed due to error making the vcpu current: %s",
+                stringify_vmx_op_status(ret)
+        );
+        return -1;
+    }
 
-    vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
-    vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
-    vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
+    if (launch_state == VMCS_LS_INVALID) {
+        pr_error("vCPU launch state is invalid (neither 'clear' or 'launched')");
+        return -1;
+    }
 
-    ret = do_vmx_vcpu_enter(vcpu->arch.state.user_regs);
-    pr_error("Failed to enter VCPU: %lu", U64(ret));
-    return ret;
+    ret = asm_do_vmx_vcpu_entry(vcpu, launch_state, &vcpu->arch.state.user_regs);
+    pr_error("vmx entry op unsucessful: %s", stringify_vmx_op_status(ret));
+    dump_vmcs();
+    die_reason("blocker for now");
 }
 
-/* TODO: move this function to vmcs.c instead */
-static void __dump_vmcs(void);
-
 void
-vmx_vm_exit_handler(void)
+vmx_vm_exit_handler(struct vcpu_user_regs *regs)
 {
-    uint64_t ret;
     uint64_t exit_reason_raw;
     vmcs_exit_reason_t exit_reason;
 
-    pr_debug("vmx_vm_exit_handler()");
+    vmread(GUEST_RIP, &regs->rip);
+    vmread(GUEST_RFLAGS, &regs->rflags);
 
-    if ((ret = vmread(EXIT_REASON, &exit_reason_raw)) != VMX_OP_SUCCESS) {
-        pr_error("Failed to read the vmcs EXIT_REASON field: %lu", ret);
-        die();
-    }
+    current_vcpu->arch.hw.vmx.launch_state = VMCS_LS_LAUNCHED;
 
+    vmread(EXIT_REASON, &exit_reason_raw);
     exit_reason.raw = exit_reason_raw;
 
+    /**
+     * TODO: Create an emlation struct with function pointers to actual handlers,
+     * e.g. vcpu->emulate.cpuid(), and default impls.
+     */
     switch (exit_reason.basic_exit_reason) {
+        case EXIT_REASON_CPUID:
+            pr_info("handling cpuid exit");
+            NOT_YET_IMPLEMENTED;
+            /*regs->rip += 1;
+            vmx_enter_vcpu(current_vcpu);*/
         default:
-            __dump_vmcs();
+            dump_vmcs();
             die();
     }
 
