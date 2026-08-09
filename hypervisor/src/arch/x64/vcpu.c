@@ -203,5 +203,7 @@ init_guest_reg_state_for_linux_32bit(struct vcpu_guest_reg_state *state)
     state->uregs.eflags = 0x02;
 
     init_segments_for_linux_32bit(&state->segments);
+
+    state->gdtr.limit = 0xFF;
 }
 

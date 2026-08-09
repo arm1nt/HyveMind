@@ -296,7 +296,7 @@ load_linux_32bit_direct_boot_for_vm(
             vm,
             LINUX_GUEST_DEFAULT_COMMAND_LINE_GPADDR,
             command_line,
-            command_line_len
+            command_line_len + 1
     );
     if (ret != 0) {
         pr_error("Failed to load the command line string into the VM memory");

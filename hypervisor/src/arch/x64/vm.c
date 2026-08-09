@@ -9,98 +9,6 @@
 
 extern void vm_entry_test(void);
 
-static inline void
-init_default_virt_policy(struct vmx_virt_policy *policy)
-{
-    vmx_init_default_policy(policy);
-}
-
-static int
-set_guest_info(vcpu_t *vcpu, struct vcpu_guest_arch_state *state)
-{
-    vcpu->arch.state.user_regs = state->uregs;
-
-    vmx_set_guest_cr0(vcpu, state->cr0);
-    vmx_set_guest_cr3(vcpu, state->cr3);
-    vmx_set_guest_cr4(vcpu, state->cr4);
-
-    vmx_set_segment_register(vcpu, X86_CS_REG, state->segments.cs);
-    vmx_set_segment_register(vcpu, X86_SS_REG, state->segments.ss);
-    vmx_set_segment_register(vcpu, X86_DS_REG, state->segments.ds);
-    vmx_set_segment_register(vcpu, X86_ES_REG, state->segments.es);
-    vmx_set_segment_register(vcpu, X86_FS_REG, state->segments.fs);
-    vmx_set_segment_register(vcpu, X86_GS_REG, state->segments.gs);
-    vmx_set_segment_register(vcpu, X86_TR_REG, state->segments.tr);
-    vmx_set_segment_register(vcpu, X86_LDTR_REG, state->segments.ldtr);
-
-    vmx_set_system_table(vcpu, X86_GDT, state->gdtr);
-    vmx_set_system_table(vcpu, X86_IDT, state->idtr);
-
-    return 0;
-}
-
-static int
-init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
-{
-    int ret;
-    vcpu_t *bsp, *ap;
-    struct vmx_virt_policy *policy;
-    struct vcpu_guest_arch_state vcpu_guest_state;
-
-    bsp = vm->vcpus[0];
-    policy = bsp->arch.hw.vmx.virt_policy;
-
-    init_default_virt_policy(policy);
-    policy->entry_ctls.ia32e_mode_guest = 1;
-    policy->exit_ctls1.host_addr_space_size = 1;
-
-    if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
-        pr_error("Configured virt policy cannot be realized");
-        return -1;
-    }
-
-    if ((ret = vmx_initialize_vmcs_area(bsp)) != 0) {
-        pr_error("Failed to initialize vcpu's VMCS area: %lu", U64(ret));
-        return ret;
-    }
-
-    vcpu_guest_mirror_current_cpu(&vcpu_guest_state);
-
-    if ((ret = vcpu_guest_allocate_stack(&vcpu_guest_state, DEFAULT_VCPU_STACK_PAGES)) != 0) {
-        pr_error("Failed to allocate stack for vcpu guest");
-        return ret;
-    }
-
-    vcpu_guest_state.uregs.rip = __vaddr(vm_entry_test);
-
-    if ((ret = set_guest_info(bsp, &vcpu_guest_state)) != 0) {
-        pr_error("Failed to initialize the vcpu guest state");
-        return ret;
-    }
-
-    /* remove */
-    vmx_enter_vcpu(bsp);
-
-    return 0;
-}
-
-static inline void
-configure_linux_direct_boot_32bit_policy(struct vmx_virt_policy *policy)
-{
-    init_default_virt_policy(policy);
-
-    policy->proc_ctls1.activate_secondary_controls = 1;
-    policy->proc_ctls1.msr_bitmaps = 1;
-    policy->proc_ctls2.enable_ept = 1;
-    policy->proc_ctls2.unrestricted_guest = 1;
-
-    policy->exit_ctls1.host_addr_space_size = 1;
-    policy->exit_ctls1.load_ia32_efer = 1;
-    policy->exit_ctls1.save_ia32_efer = 1;
-
-    policy->entry_ctls.load_ia32_efer = 1;
-}
-
 int
 copy_to_vm_gpaddr(struct vm *vm, const gpaddr start, const void *data, const uint64_t size)
 {
@@ -170,30 +78,150 @@ virtualize_guest_physical_memory(struct vm *vm, const struct guest_config *confi
     return 0;
 }
 
+static inline void
+init_default_virt_policy(struct vmx_virt_policy *policy)
+{
+    vmx_init_default_policy(policy);
+}
+
+static int
+set_guest_info(vcpu_t *vcpu, struct vcpu_guest_reg_state *state)
+{
+    int ret = 0;
+
+    vcpu->arch.state.user_regs = state->uregs;
+
+    ret |= vmx_set_guest_cr0(vcpu, state->cr0);
+    vmx_set_guest_cr3(vcpu, state->cr3);
+    vmx_set_guest_cr4(vcpu, state->cr4);
+
+    vmx_set_guest_efer(vcpu, state->efer);
+
+    ret |= vmx_set_segment_register(vcpu, X86_CS_REG, state->segments.cs);
+    ret |= vmx_set_segment_register(vcpu, X86_SS_REG, state->segments.ss);
+    ret |= vmx_set_segment_register(vcpu, X86_DS_REG, state->segments.ds);
+    ret |= vmx_set_segment_register(vcpu, X86_ES_REG, state->segments.es);
+    ret |= vmx_set_segment_register(vcpu, X86_FS_REG, state->segments.fs);
+    ret |= vmx_set_segment_register(vcpu, X86_GS_REG, state->segments.gs);
+    ret |= vmx_set_segment_register(vcpu, X86_TR_REG, state->segments.tr);
+    ret |= vmx_set_segment_register(vcpu, X86_LDTR_REG, state->segments.ldtr);
+
+    ret |= vmx_set_system_table(vcpu, X86_GDT, state->gdtr);
+    ret |= vmx_set_system_table(vcpu, X86_IDT, state->idtr);
+
+    return ret;
+}
+
+static int
+init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
+{
+    int ret;
+    vcpu_t *bsp, *ap;
+    virt_addr_t stack_bot;
+    struct vmx_virt_policy *policy;
+    struct vcpu_guest_reg_state vcpu_guest_state;
+
+    bsp = vm->vcpus[0];
+    policy = bsp->arch.hw.vmx.virt_policy;
+
+    init_default_virt_policy(policy);
+    policy->entry_ctls.ia32e_mode_guest = 1;
+    policy->exit_ctls1.host_addr_space_size = 1;
+
+    if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
+        pr_error("Configured virt policy cannot be realized: %lu", U64(ret));
+        return -1;
+    }
+
+    if (vmx_initialize_vmcs_area(bsp) != 0) {
+        pr_error("Failed to initialize vcpu's VMCS area");
+        return ret;
+    }
+
+    if (get_pages_zeroed(DEFAULT_VCPU_STACK_PAGES, &stack_bot) != 0) {
+        pr_error("Failed to allocate pages for guest stack");
+        return -1;
+    }
+
+    init_guest_reg_state_mirroring_host(&vcpu_guest_state);
+    vcpu_guest_state.uregs.rsp = (stack_bot + (DEFAULT_VCPU_STACK_PAGES * PAGE_SIZE)) - 8;
+    vcpu_guest_state.uregs.rip = __vaddr(vm_entry_test);
+
+    if (set_guest_info(bsp, &vcpu_guest_state) != 0) {
+        pr_error("Failed to initialize guest register state");
+        free_pages(DEFAULT_VCPU_STACK_PAGES, stack_bot);
+        return -1;
+    }
+
+    /* remove later */
+    vmx_enter_vcpu(bsp);
+
+    die_reason("blocker");
+}
+
+static inline void
+configure_linux_32bit_policy(struct vmx_virt_policy *policy)
+{
+    init_default_virt_policy(policy);
+
+    policy->proc_ctls1.activate_secondary_controls = 1;
+    policy->proc_ctls2.enable_ept = 1;
+    policy->proc_ctls2.unrestricted_guest = 1;
+
+    policy->exit_ctls1.host_addr_space_size = 1;
+    policy->exit_ctls1.load_ia32_efer = 1;
+    policy->exit_ctls1.save_ia32_efer = 1;
+
+    policy->entry_ctls.load_ia32_efer = 1;
+}
+
 static int
 init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config)
 {
     int ret;
     vcpu_t *bsp, *ap;
     struct vmx_virt_policy *policy;
-    struct vcpu_guest_arch_state guest_state;
+    struct vcpu_guest_reg_state guest_state;
+    struct linux_load_info load_info;
 
     bsp = vm->vcpus[0];
     policy = bsp->arch.hw.vmx.virt_policy;
 
-    configure_linux_direct_boot_32bit_policy(policy);
+    configure_linux_32bit_policy(policy);
     if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
-        pr_error("Linux 32b VM setup configures an invalid virt policy: %le", U64(ret));
+        pr_error("Configured virt policy is invalid: %lu", U64(ret));
         return -1;
     }
 
-    if ((ret = virtualize_guest_physical_memory(vm, config)) != 0) {
-        pr_error("Failed to create virtualized memory for VM");
+    if (virtualize_guest_physical_memory(vm, config) != 0) {
+        pr_error("Failed to create virtualized memory area for the VM");
         return -1;
     }
 
+    if (load_linux_32bit_direct_boot_for_vm(vm, config, &load_info) != 0) {
+        pr_error("Failed to load & setup kernel for the guest");
+        return -1;
+    }
 
-    NOT_YET_IMPLEMENTED;
+    if (vmx_initialize_vmcs_area(bsp) != 0) {
+        pr_error("Failed to initialize linux guest bsp's VMCS area");
+        return -1;
+    }
+
+    init_guest_reg_state_for_linux_32bit(&guest_state);
+    guest_state.gdtr.base = load_info.gdt_page;
+    guest_state.uregs.eip = load_info.pm_kernel_entry_point;
+    guest_state.uregs.rsi = load_info.zero_page;
+
+    if (set_guest_info(bsp, &guest_state) != 0) {
+        pr_error("Failed to initialize guest register state");
+        return -1;
+    }
+
+    /* todo: remove later */
+    vmx_enter_vcpu(bsp);
+
+    die_reason("blocker");
 }
 
 int
@@ -216,6 +244,7 @@ void
 destroy_arch_vm(struct vm *vm)
 {
     /* De-allocate eptp structures, bitmaps, etc. */
+    NOT_YET_IMPLEMENTED;
 }
 
 int

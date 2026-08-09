@@ -119,7 +119,5 @@ segment_selector_t read_segment_register(const enum x86_segment_reg reg);
 void load_tr_register(const segment_selector_t *selector);
 void load_segment_registers(const struct segment_regs *regs);
 
-virt_addr_t get_base_from_tss_descriptor(const tss_descriptor_t *desc);
-
 #endif /* _HYVEMIND_X64_ASM_SEGMENTATION_H */
 
