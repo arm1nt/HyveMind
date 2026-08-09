@@ -2,6 +2,7 @@
 #define _HYVEMIND_GUEST_CONFIG_H
 
 #include "hyvstdlib.h"
+#include "limine/limine.h"
 
 enum mem_granularity {
     BYTES,
@@ -25,8 +26,13 @@ struct guest_config {
     enum mem_granularity mem_granularity;
 
     /* Names as specified in the limine config */
-    char *bzImageName;
-    char *initramfsName;
+    char *bzImage_name;
+    char *initramfs_name;
+
+    void *bzImage_addr;
+    uint64_t bzImage_size;
+    void *initramfs_addr;
+    uint64_t initramfs_size;
 };
 typedef struct guest_config guest_cfg_t;
 
@@ -35,7 +41,7 @@ struct guest_config_info {
     guest_cfg_t *guest_configs;
 };
 
-struct guest_config_info get_guest_configs(void);
+struct guest_config_info get_guest_configs(const struct limine_module_response *mods);
 uint64_t get_req_mem_size_bytes(const struct guest_config *config);
 
 #endif /* _HYVEMIND_GUEST_CONFIG_H */

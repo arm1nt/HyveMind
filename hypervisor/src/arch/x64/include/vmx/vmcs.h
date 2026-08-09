@@ -25,7 +25,7 @@ struct vmcs {
 #define NO_CURRENT_VMCS_ADDR    (~U64(0))
 #define NO_VMCS_LINK_PTR        (~U64(0))
 
-enum vmcs_launch_state: int {
+enum vmcs_launch_state {
     VMCS_LS_INVALID     = VMCS_LS_INVALID_VAL,
     VMCS_LS_CLEAR       = VMCS_LS_CLEAR_VAL,
     VMCS_LS_LAUNCHED    = VMCS_LS_LAUNCHED_VAL,

@@ -3,32 +3,13 @@
 
 #include "fatal.h"
 #include "halloc.h"
-#include "limine/requests.h"
 #include "pf_alloc.h"
 #include "phys_mm.h"
 #include "printf.h"
-#include "string.h"
+#include "vm.h"
 #include "asm/setup.h"
 #include "asm/paging.h"
-
-#ifdef HYVEMIND_GUEST_CONFIG_FROM_BOOTLOADER
-
-static inline void
-confirm_bootloader_guest_info(void)
-{
-    if (module_request.response == NULL || module_request.response->module_count < 1) {
-        die_reason("The bootloader did not provide module information!");
-    }
-}
-
-#else
-
-static inline void
-confirm_bootloader_guest_info(void)
-{
-}
-
-#endif /* HYVEMIND_GUEST_CONFIG_FROM_BOOTLOADER */
+#include "limine/requests.h"
 
 static void
 confirm_bootloader_info(void)
@@ -36,8 +17,6 @@ confirm_bootloader_info(void)
     if (memmap_request.response == NULL || memmap_request.response->entry_count < 1) {
         die_reason("Bootloader did not provide a memory map");
     }
-
-    confirm_bootloader_guest_info();
 
     if (exec_addr_request.response == NULL) {
         die_reason("Bootloader did not provide information about the executables' address");
@@ -67,7 +46,6 @@ hypervisor_main(void)
     if (init_printf() != 0) {
         die();
     }
-
     pr_debug("Successfully initialized printf!");
 
     confirm_bootloader_info();
@@ -98,13 +76,25 @@ hypervisor_main(void)
     pr_debug("Done with arch setup of the bootstrap processor");
 
     if (init_halloc() != 0) {
-        die_reason("Failed to initialize the hypervisor's internal heap memory allocator");
+        die_reason("Failed to initialize the hypervisor's internal heap allocator");
     }
     pr_debug("Successfully inintialized the memory allocator!");
 
     arch_bringup_aps_limine(mp_request.response);
     pr_debug("Initialized APs");
 
-    die_reason("Reached end of main");
+    /* wait_until_aps_online(); */
+
+    const struct guest_config_info guest_info = get_guest_configs(module_request.response);
+
+    for (unsigned int i = 0; i < guest_info.nr_guests; i++) {
+        struct vm *vm = create_vm(&guest_info.guest_configs[i]);
+        pr_info("Created VM: %s", vm->name);
+        destroy_vm(vm);
+    }
+
+    /* todo: submit created vcpus to scheduler */
+
+    die_reason("reached end of main");
 }
 
