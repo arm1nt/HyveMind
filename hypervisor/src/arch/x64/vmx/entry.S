@@ -1,4 +1,5 @@
-# Might need some refactoring when we try to integrate it into a basic scheduler.
+# todo: needs some changes (e.g. be able to return from the exit_handler) to
+#   work in a scheduling loop.
 
 .section .text
 
@@ -82,27 +83,19 @@
 
 def_global_func asm_vmx_vm_exit_handler
 asm_vmx_vm_exit_handler:
-    # Make one register available for use by us
+    # Make one register available to store the user regs struct ptr
     pushq %rdi
-
-    # Get the address of the user_regs struct that we store above the rsp
     movq +0x08(%rsp), %rdi
 
     save_guest_regs rdi
-
-    # Now we can save the guest rdi from the stack
     movq (%rsp), %r8
     save_and_clear_reg rdi, r8, USREG_RDI
 
-    # Starting from here all guest state is saved. So we can set stack ptrs
+    # Starting from here all guest state is saved.
     addq $0x08, %rsp
     movq %rsp, %rbp
 
-    # TODO: change the vcpu state to launched
-
-    # We pass the pointer to the vcpu_user_regs struct to the handler
     movq (%rsp), %rdi
-
     callq vmx_vm_exit_handler
 
     # Atm, this point should be unreachable since we explicitly call do_enter_vcpu
@@ -125,7 +118,9 @@ asm_do_vmx_vcpu_entry:
 
     movq %r12, %rdi
     callq __vmx_entry_helper
-    test $0x1, %rax
+    movq %rax, %rbx
+    movq $-0x01, %rax
+    test $0x1, %rbx
     jz .Lvm_entry_fail
 
     cmp $VMCS_LS_CLEAR_VAL, %r13d
@@ -147,7 +142,8 @@ asm_do_vmx_vcpu_entry:
 
 .Lvm_entry_op_fail:
     pushfq
-    popq %rax
+    popq %rdi
+    callq eflags_to_vmx_op_status
 
 .Lvm_entry_fail:
     pop_preserved_regs

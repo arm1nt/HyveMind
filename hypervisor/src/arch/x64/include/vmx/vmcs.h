@@ -1,7 +1,12 @@
 #ifndef _HYVEMIND_X64_VMX_VMCS_H
 #define _HYVEMIND_X64_VMX_VMCS_H
 
-#include "hyvstdlib.h"
+#define VMCS_LS_INVALID_VAL     0x00
+#define VMCS_LS_CLEAR_VAL       0x01
+#define VMCS_LS_LAUNCHED_VAL    0x02
+
+#ifndef __ASSEMBLER__
+
 #include "mm_types.h"
 #include "asm/cpufeatures.h"
 #include "asm/processor.h"
@@ -17,52 +22,14 @@ struct vmcs {
     uint8_t data[];
 };
 
-#define NO_CURRENT_VMCS_ADDR    0xFFFFFFFFFFFFFFFF
-#define NO_VMCS_LINK_PTR        0xFFFFFFFFFFFFFFFF
+#define NO_CURRENT_VMCS_ADDR    (~U64(0))
+#define NO_VMCS_LINK_PTR        (~U64(0))
 
-enum vmcs_launch_state {
-    VMCS_LS_INVALID,
-    VMCS_LS_CLEAR,
-    VMCS_LS_LAUNCHED,
+enum vmcs_launch_state: int {
+    VMCS_LS_INVALID     = VMCS_LS_INVALID_VAL,
+    VMCS_LS_CLEAR       = VMCS_LS_CLEAR_VAL,
+    VMCS_LS_LAUNCHED    = VMCS_LS_LAUNCHED_VAL,
 };
-
-#define VM_INS_ERROR_MIN_VALUE 1
-#define VM_INS_ERROR_MAX_VALUE 28
-
-enum vm_instruction_error {
-    VMCS_INS_NO_ERROR,
-    VMCALL_IN_VMX_ROOT,
-    VMCLEAR_WITH_INVALID_PADDR,
-    VMCLEAR_WITH_VMXON_PTR,
-    VMLAUNCH_WITH_NONCLEAR_VMCS,
-    VMRESUME_WITH_NONLAUNCHED_VMCS,
-    VMRESUME_AFTER_VMXOFF,
-    VM_ENTRY_WITH_INVALID_CTRL_FIELDS,
-    VM_ENTRY_WITH_INVALID_HOST_STATE_FIELDS,
-    VMPTRLD_WITH_INVALID_PADDR,
-    VMPTRLD_WITH_VMXON_PTR,
-    VMPTRLD_WITH_INVALID_VMCS_REVISION_ID,
-    VMREAD_VMWRITE_TO_UNSUPPORTED_VMCS_COMPONENT,
-    VMWMRITE_TO_RDONLY_VMCS_COMPONENT,
-    VMXON_IN_VMX_ROOT,
-    VM_ENTRY_WITH_INVALID_EXECUTIVE_VMCS_PTR,
-    VM_ENTRY_WITH_NONLAUNCHED_EXECUTIVE_VMCS,
-    VM_ENTRY_WITH_EXECUTIVE_VMCS_PTR_NOT_VMXON_PTR,
-    VMCALL_WITH_NONCLEAR_VMCS,
-    VMCALL_WITH_INVALID_VM_EXIT_CTRL_FIELDS,
-    VMCALL_WITH_INCORRECT_MSEG_REV_ID,
-    VMXOFF_UNDER_DUAL_MONITOR,
-    VMCALL_WITH_INVALID_SMM_FTRS,
-    VM_ENTRY_WITH_INVALID_EXECUTION_CTRL_FIELDS_IN_EXECUTIVE_VMCS,
-    VM_ENTRY_WITH_EVENTS_BLOCKED_BY_MOV_SS,
-    INVALID_OPERAND_TO_INVEPT_INVVPID
-};
-
-static inline bool
-is_valid_vm_ins_error(const int val)
-{
-    return (VM_INS_ERROR_MIN_VALUE <= val) && (val <= VM_INS_ERROR_MAX_VALUE);
-}
 
 union guest_state_access_rights {
     uint32_t raw;
@@ -593,23 +560,10 @@ enum vmcs_field_encoding: uint64_t {
 };
 typedef uint64_t vmcs_field_encoding_t;
 
-struct vcpu;
-
 phys_addr_t create_new_vmcs_area(void);
-void dump_vmcs(const struct vcpu *vcpu);
+void dump_vmcs(void);
 
-
-void vmcs_write_field(const vmcs_field_encoding_t encoding, const uint64_t value);
-#define vmcs_write_16bit_field(encoding, value) vmcs_write_field(encoding, value)
-#define vmcs_write_32bit_field(encoding, value) vmcs_write_field(encoding, value)
-#define vmcs_write_64bit_field(encoding, value) vmcs_write_field(encoding, value)
-#define vmcs_write_natural_field(encoding, value) vmcs_write_field(encoding, value)
-
-uint64_t vmcs_read_field(const vmcs_field_encoding_t encoding);
-#define vmcs_read_16bit_field(encoding) vmcs_read_field(encoding)
-#define vmcs_read_32bit_field(encoding) vmcs_read_field(encoding)
-#define vmcs_read_64bit_field(encoding) vmcs_read_field(encoding)
-#define vmcs_read_natural_field(encoding) vmcs_read_field(encoding)
+#endif /* !__ASSEMBLER__ */
 
 #endif /* _HYVEMIND_X64_VMX_VMCS_H */
 
