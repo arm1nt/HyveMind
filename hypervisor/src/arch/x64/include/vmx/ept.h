@@ -40,7 +40,7 @@ struct ept_mapping_info {
     uint64_t pml4e_flags;
     uint64_t pdpte_flags;
     uint64_t pde_flags;
-    uint64_t pte_pfags;
+    uint64_t pte_flags;
 
     bool use_gb_mappings;
     bool use_mb_mappings;

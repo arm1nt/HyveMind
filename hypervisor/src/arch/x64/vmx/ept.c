@@ -85,7 +85,7 @@ do_ept_pt_mapping(
 
         if (!is_ept_entry_present(entry->raw)) {
             ept_pte_set_paddr(entry, curr_start + info->offset);
-            entry->raw |= info->pte_pfags;
+            entry->raw |= info->pte_flags;
             goto ept_pt_table_prepare_next_block;
         }
 
@@ -117,9 +117,7 @@ do_ept_pd_mapping(
         ept_pde *entry = (ept_pde *) (pd_table_ptr + block_index);
 
         if (!is_ept_entry_present(entry->raw) && info->use_mb_mappings) {
-            /* Install a mb mapping */
-            die_reason("mb mapping support not yet implemented");
-            goto ept_pd_table_prepare_next_block;
+            NOT_YET_IMPLEMENTED;
         }
 
         if (!is_ept_entry_present(entry->raw)) {
@@ -167,8 +165,7 @@ do_ept_pdpt_mapping(
         const gpaddr guest_start,
         const gpaddr guest_end,
         const struct ept_mapping_info *info
-)
-{
+) {
     int ret, block_index;
     gpaddr curr_start, curr_end;
 
@@ -182,8 +179,7 @@ do_ept_pdpt_mapping(
 
         if (!is_ept_entry_present(entry->raw) && info->use_gb_mappings) {
             /* Create a gb mapping */
-            die_reason("ept gb mapping not implemented yet");
-            goto ept_pdpt_prepare_next_block;
+            NOT_YET_IMPLEMENTED;
         }
 
         if (!is_ept_entry_present(entry->raw)) {
@@ -298,26 +294,5 @@ create_ept_mapping(eptp_t *eptp, struct ept_mapping_info *info)
             info->guest_paddr_start + info->req_bytes,
             info
     );
-}
-
-/* todo: prob. move into vm.c */
-void
-phys_copy_to_vm(
-        const struct vm_addr_space *vm_addr_space,
-        const gpaddr guest_paddr,
-        const void *value,
-        const uint64_t value_size
-)
-{
-}
-
-void
-copy_to_vm(
-        const struct vm_addr_space *vm_addr_space,
-        const gvaddr guest_vaddr,
-        const void *value,
-        const uint64_t value_size
-)
-{
 }
 

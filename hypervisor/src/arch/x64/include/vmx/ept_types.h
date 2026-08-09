@@ -14,16 +14,6 @@
 #define EPT_PAGE_WALK_LEN_4 (3)
 #define EPT_PAGE_WALK_LEN_5 (4)
 
-/* prob. move into vm.h header */
-struct vm_addr_space {
-    /**
-     * We could also use non-contigous chunks instead of one large contigous
-     * area.
-     */
-    virt_addr_t __directly_mapped host_start;
-    virt_addr_t __directly_mapped host_end;
-};
-
 union eptp {
     uint64_t raw;
     struct {
