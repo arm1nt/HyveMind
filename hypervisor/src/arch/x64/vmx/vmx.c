@@ -622,7 +622,13 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
     vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
 
     if (vmx_policy_is_option_configured(policy, VMX_POLICY_MSR_BITMAP)) {
-        /* TODO: init a bitmap that inhibits vm-exits for every msr */
+        if (vcpu->vm->arch_vm.vmx.msr_bitmap_addr) {
+            vmwrite(ADDRESS_MSR_BITMAPS, vcpu->vm->arch_vm.vmx.msr_bitmap_addr);
+        } else  {
+            pr_warn("MSR bitmap config is configured but no msr bitmap address "
+                    "is provided. Skipping this field in the VMCS initialization"
+            );
+        }
     }
 
     if (vmx_policy_is_option_configured(policy, VMX_POLICY_EPT)) {
@@ -690,6 +696,7 @@ vmx_vm_exit_handler(struct vcpu_user_regs *regs)
     vmcs_exit_reason_t exit_reason;
 
     vmread(GUEST_RIP, &regs->rip);
+    vmread(GUEST_RSP, &regs->rsp);
     vmread(GUEST_RFLAGS, &regs->rflags);
 
     current_vcpu->arch.hw.vmx.launch_state = VMCS_LS_LAUNCHED;

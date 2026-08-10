@@ -63,7 +63,7 @@ struct arch_vcpu {
 struct arch_vm {
     struct {
         eptp_t eptp;
-        void *msr_bitmap;
+        phys_addr_t msr_bitmap_addr;
     } vmx;
 };
 
