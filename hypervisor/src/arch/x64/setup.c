@@ -1,7 +1,6 @@
 #include "fatal.h"
 #include "mm_types.h"
 #include "per-cpu.h"
-#include "sched.h"
 #include "string.h"
 #include "asm/apic.h"
 #include "asm/gdt_idt.h"
@@ -9,6 +8,7 @@
 #include "asm/pgtables.h"
 #include "asm/setup.h"
 #include "asm/vmm.h"
+#include "vmx/vmx.h"
 
 DEFINE_PER_CPU_VAL(uint32_t, cpuid_range_base, CPUID_RANGE_BASE_VAL);
 DEFINE_PER_CPU(uint32_t, cpuid_max_leaf);
@@ -271,6 +271,10 @@ __arch_setup_bsp(void)
     if (!enable_vmx_feature_support()) {
         die_reason("Unable to enable VMX support for BSP");
     }
+
+    if (!enter_vmx_operation()) {
+        die_reason("Error while trying to enter VMX operation on BSP");
+    }
 }
 
 extern uint8_t boot_info_scratch[];
@@ -311,10 +315,14 @@ arch_setup_ap(void)
         die_reason("Cannot enable VMX support for processor");
     }
 
+    if (!enter_vmx_operation()) {
+        current->state = PROCESSOR_UNAVAILABLE;
+        die_reason("Error while trying to enter VMX operation");
+    }
+
     current->state = PROCESSOR_INIT;
-    /* rebase before we enter the idle loop and not here */
-    arch_rebase_current_stack(DEFAULT_HYV_THREAD_STACK_SIZE, 1);
-    die_reason("and dead.");
+    die_reason("ap end");
+    /* startup_enter_idle_loop(); */
 }
 
 static void __no_return
