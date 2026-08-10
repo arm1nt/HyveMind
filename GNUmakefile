@@ -87,7 +87,9 @@ $(TARGET_HDD): install_limine build_hypervisor
 	$(Q)mcopy -i $@@@1M limine.conf ::/boot/limine/
 	$(Q)mcopy -i $@@@1M $(BUILD_DEPS_LOCATION)/limine/bin/BOOTX64.EFI ::/EFI/BOOT/
 	$(Q)mcopy -i $@@@1M hypervisor/build/bin-x64/hyvemind ::/boot/
+ifneq ($(wildcard hypervisor/resources/*),)
 	$(Q)mcopy -s -i $@@@1M hypervisor/resources/* ::/guest-info/
+endif
 
 PHONY += clean
 clean: clean_hypervisor
