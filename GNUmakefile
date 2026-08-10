@@ -47,7 +47,7 @@ gen_iso_root_dir: install_limine_bootloader build_hypervisor
 	$(Q)cp -v $(BUILD_DEPS_LOCATION)/limine/BOOTX64.EFI \
 		$(BUILD_DEPS_LOCATION)/limine/BOOTIA32.EFI \
 		$(ISO_ROOT_DIR)/EFI/BOOT/
-	$(Q)cp hypervisor/resources/* $(ISO_ROOT_DIR)/guest-info/
+	$(Q)cp -r hypervisor/resources/. $(ISO_ROOT_DIR)/guest-info/
 
 PHONY += gen_iso_image
 gen_iso_image: $(BUILD_TARGET_LOCATION)/isos/$(OUTPUT).iso
