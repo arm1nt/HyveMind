@@ -5,7 +5,7 @@ A bare-metal x86-64 hypervisor using Intel's Virtual Machine Extensions.
 To run with information being printed:
 
 ```
-make qemu_run_iso_uefi QUIET=1 DEBUG_BUILD=1
+make qemu_run_hdd_uefi QUIET=1 DEBUG_BUILD=1
 ```
 
 ### Currently working on:

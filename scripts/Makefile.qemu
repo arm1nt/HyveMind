@@ -1,5 +1,3 @@
-# QEMU related rules and configuration
-
 QEMU_OVMF_CURL_FLAGS := -L
 
 ifneq ($(Q),)
@@ -17,9 +15,8 @@ $(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed:
 	$(Q)mkdir -p $(BUILD_DEPS_LOCATION)
 	$(Q)curl $(QEMU_OVMF_CURL_FLAGS) $(QEMU_OVMF_ARCHIVE_LINK) \
 		| tar -C $(BUILD_DEPS_LOCATION) -zxf -
-	$(Q)touch $(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed
+	$(Q)touch $@
 
-TARGET_ISO := $(BUILD_TARGET_LOCATION)/isos/$(OUTPUT).iso
 QEMUFLAGS :=
 
 ifdef QEMU_GDB_DEBUG
@@ -27,7 +24,7 @@ ifdef QEMU_GDB_DEBUG
 endif
 
 PHONY += qemu_run_iso_uefi
-qemu_run_iso_uefi: qemu_get_ovmf $(TARGET_ISO)
+qemu_run_iso_uefi: qemu_get_ovmf gen_iso_image
 	$(Q)echo "Starting $(NAME)..."
 	$(Q)qemu-system-x86_64 \
 		-cpu host,+vmx,+x2apic \
@@ -35,14 +32,27 @@ qemu_run_iso_uefi: qemu_get_ovmf $(TARGET_ISO)
 		-no-reboot \
 		-no-shutdown \
 		-nographic \
-		-d int \
-		-d cpu_reset \
-		-D qemu.log \
 		-smp 1 \
 		-m 15G \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
 		-cdrom $(TARGET_ISO) \
 		-boot d \
+		-s \
+		$(QEMUFLAGS)
+
+PHONY += qemu_run_hdd_uefi
+qemu_run_hdd_uefi: qemu_get_ovmf gen_hdd_image
+	$(Q)echo "Starting $(NAME)..."
+	$(Q)qemu-system-x86_64 \
+		-cpu host,+vmx,+x2apic \
+		-enable-kvm \
+		-no-reboot \
+		-no-shutdown \
+		-nographic \
+		-smp 1 \
+		-m 15G \
+		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-hda $(TARGET_HDD) \
 		-s \
 		$(QEMUFLAGS)
 

@@ -1,0 +1,61 @@
+LIMINE_ROOT_PATH = $(BUILD_DEPS_LOCATION)/limine
+
+ifeq ($(LIMINE_BUILD_SOURCES), 1)
+	LIMINE_INSTALL_PATH = $(LIMINE_ROOT_PATH)
+	LIMINE_BOOTLOADER_BRANCH := --branch=v11.x
+else
+	LIMINE_INSTALL_PATH = $(LIMINE_ROOT_PATH)/bin
+	LIMINE_BOOTLOADER_BRANCH := --branch=v11.x-binary
+endif
+
+LIMINE_GIT_CLONE_CONFIG := https://github.com/Limine-Bootloader/Limine.git \
+						   $(LIMINE_INSTALL_PATH) 		\
+						   $(LIMINE_BOOTLOADER_BRANCH) 	\
+						   --depth=1
+
+PHONY += install_limine
+ifeq ($(LIMINE_BUILD_SOURCES), 1)
+install_limine: download_limine compile_limine
+else
+install_limine: download_limine build_limine
+endif
+
+download_limine: $(LIMINE_ROOT_PATH)/.downloaded
+
+$(LIMINE_ROOT_PATH)/.downloaded:
+	$(Q)echo "Loading limine sources into $(LIMINE_INSTALL_PATH)"
+	$(Q)rm -rf $(LIMINE_ROOT_PATH)
+	$(Q)git clone $(LIMINE_GIT_CLONE_CONFIG)
+	$(Q)touch $@
+
+compile_limine: $(LIMINE_ROOT_PATH)/.compiled
+
+$(LIMINE_ROOT_PATH)/.compiled: download_limine
+	$(Q)cd $(LIMINE_INSTALL_PATH) && chmod +x ./bootstrap
+	$(Q)cd $(LIMINE_INSTALL_PATH) && ./bootstrap
+	$(Q)cd $(LIMINE_INSTALL_PATH) && ./configure --enable-uefi-x86-64 --enable-uefi-cd
+	$(Q)$(MAKE) -C $(LIMINE_INSTALL_PATH)
+	$(Q)touch $@
+
+LIMINE_HOST_CC := gcc
+LIMINE_HOST_CFLAGS := -g -O2 -pipe
+LIMINE_HOST_CPPFLAGS :=
+LIMINE_HOST_LDFLAGS :=
+LIMINE_HOST_LIBS :=
+
+build_limine: $(LIMINE_ROOT_PATH)/.built
+
+$(LIMINE_ROOT_PATH)/.built: download_limine
+	$(Q)$(MAKE) -C $(LIMINE_INSTALL_PATH)		\
+		CC="$(LIMINE_HOST_CC)"					\
+		CFLAGS="$(LIMINE_HOST_CFLAGS)"			\
+		CPPFLAGS="$(LIMINE_HOST_CPPFLAGS)"		\
+		LDFLAGS="$(LIMINE_HOST_LDFLAGS)"		\
+		LIBS="$(LIMINE_HOST_LIBS)"
+	$(Q)touch $@
+
+PHONY += delete_limine_installation
+delete_limine_installation:
+	$(Q)echo "Deleting the downloaded limine files..."
+	$(Q)rm -rf $(LIMINE_ROOT_PATH)
+
