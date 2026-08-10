@@ -446,7 +446,7 @@ enum vmcs_field_encoding: uint64_t {
     /* 64 bit fields (encodings for access type FULL) */
     ADDRESS_IO_BITMAP_A                     = 0x00002000,
     ADDRESS_IO_BITMAP_B                     = 0x00002002,
-    ADDRESS_MSRR_BITMAPS                    = 0x00002004,
+    ADDRESS_MSR_BITMAPS                     = 0x00002004,
     VM_EXIT_MSR_STORE_ADDRESS               = 0x00002006,
     VM_EXIT_MSR_LOAD_ADDRESS                = 0x00002008,
     VM_ENTRY_MSR_LOAD_ADDRESS               = 0x0000200a,
