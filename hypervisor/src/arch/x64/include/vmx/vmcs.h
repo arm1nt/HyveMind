@@ -79,7 +79,7 @@ enum vmcs_basic_exit_reason {
     EXIT_REASON_VMWRITE,
     EXIT_REASON_VMXOFF,
     EXIT_REASON_VMXON,
-    EXIT_REASAON_CR_ACCESS,
+    EXIT_REASON_CR_ACCESS,
     EXIT_REASON_MOV_DR,
     EXIT_REASON_IO_INSTRUCTION,
     EXIT_REASON_RDMSR_IMPLICIT,
@@ -173,6 +173,46 @@ union vmcs_ept_violation_exit_qual {
     };
 };
 typedef union vmcs_ept_violation_exit_qual vmcs_ept_exit_qual_t;
+
+enum cr_qual_access_type {
+    MOV_TO_CR,
+    MOV_FROM_CR,
+    CLTS,
+    LMWS,
+};
+
+enum cr_qual_gpr {
+    CR_QUAL_RAX,
+    CR_QUAL_RCX,
+    CR_QUAL_RDX,
+    CR_QUAL_RBX,
+    CR_QUAL_RSP,
+    CR_QUAL_RBP,
+    CR_QUAL_RSI,
+    CR_QUAL_RDI,
+    CR_QUAL_R8,
+    CR_QUAL_R9,
+    CR_QUAL_R10,
+    CR_QUAL_R11,
+    CR_QUAL_R12,
+    CR_QUAL_R13,
+    CR_QUAL_R14,
+    CR_QUAL_R15,
+};
+
+union vmcs_cr_access_exit_qualification {
+    uint64_t raw;
+    struct {
+        uint64_t cr_number          : 4,
+                 access_type        : 2,
+                 lmsw_operand_type  : 1,
+                 undefined0         : 1,
+                 gpr                : 4,
+                 undefined1         : 4,
+                 source_data        : 16,
+                 undefined2         : 32;
+    };
+};
 
 union vmcs_exit_qualification {
     vmcs_ept_exit_qual_t ept_violation_exqual;
@@ -519,6 +559,10 @@ enum vmcs_field_encoding: uint64_t {
     HOST_IA32_SYSENTER_CS                   = 0x00004c00,
 
     /* Normal width fields */
+    CR0_GUEST_HOST_MASK                     = 0x00006000,
+    CR4_GUEST_HOST_MASK                     = 0x00006002,
+    CR0_READ_SHADOW                         = 0x00006004,
+    CR4_READ_SHADOW                         = 0x00006006,
     EXIT_QUALIFICATION                      = 0x00006400,
     IO_RCX                                  = 0x00006402,
     IO_RSI                                  = 0x00006404,
