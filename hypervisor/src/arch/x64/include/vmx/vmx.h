@@ -36,6 +36,8 @@ int vmx_set_system_table(
         struct vcpu_sys_table table
 );
 
+void vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code);
+
 int vmx_enter_vcpu(vcpu_t *vcpu);
 
 #endif /* _HYVEMIND_X64_VMX_VMX_H */

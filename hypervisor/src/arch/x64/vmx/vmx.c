@@ -6,6 +6,7 @@
 #include "vm.h"
 #include "asm/cpufeatures.h"
 #include "asm/gdt_idt.h"
+#include "asm/irq_vectors.h"
 #include "asm/paging.h"
 #include "asm/processor.h"
 #include "asm/vmm.h"
@@ -249,6 +250,30 @@ leave_vmx_operation(void)
     current->vmx_operation_active = false;
 
     pr_info("Successfully left VMX operation");
+}
+
+void
+vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code)
+{
+    ensure_vcpu_current(vcpu);
+
+    vmcs_event_inject_t event_id;
+    event_id.raw = 0;
+
+    event_id.type = INJECT_EVENT_TYPE_HW_EXCEPTION;
+    event_id.valid = 1;
+    event_id.vector = vector;
+
+    switch (vector) {
+        case IRQ_GP_VECTOR:
+        default:
+            event_id.error_code = 1;
+            vmwrite(INJECTED_EVENT_ERROR_CODE, error_code);
+            break;
+    }
+
+    vmwrite(INJECTED_EVENT_IDENTIFICATION, event_id.raw);
+    clear_vcpu(vcpu);
 }
 
 static inline void

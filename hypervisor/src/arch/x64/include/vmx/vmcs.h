@@ -218,6 +218,30 @@ union vmcs_exit_qualification {
     vmcs_ept_exit_qual_t ept_violation_exqual;
 };
 
+enum {
+    INJECT_EVENT_TYPE_EXT_INTERRUPT             = 0,
+    INJECT_EVENT_TYPE_NMI                       = 2,
+    INJECT_EVENT_TYPE_HW_EXCEPTION              = 3,
+    INJECT_EVENT_TYPE_SW_INTERRUPT              = 4,
+    INJECT_EVENT_TYPE_PRIVILEGED_SW_EXCEPTION   = 5,
+    INJECT_EVENT_TYPE_SW_EXCEPTION              = 6,
+    INJECT_EVENT_TYPE_OTHER                     = 7,
+};
+
+union vmcs_event_inject {
+    uint32_t raw;
+    struct {
+        uint32_t vector     : 8,
+                 type       : 3,
+                 error_code : 1,
+                 reserved0  : 1,
+                 nested     : 1,
+                 reserved1  : 17,
+                 valid      : 1;
+    };
+};
+typedef union vmcs_event_inject vmcs_event_inject_t;
+
 #define VMX_DEFAULT1_CTLS_MAY_BE_0() \
     (IS_SET(read_msr(MSRX64_IA32_VMX_BASIC), VMX_BASIC_DEFAULT1_CTLS_MAY_BE_0))
 
