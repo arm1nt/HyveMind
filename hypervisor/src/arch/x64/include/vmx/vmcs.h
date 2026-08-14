@@ -292,7 +292,7 @@ typedef union vmcs_primary_processor_based_ctls_vector vmcs_procbased_ctls1;
 union vmcs_secondary_processor_based_ctls_vector {
     uint32_t raw;
     struct {
-        uint32_t virtualize_apic_addresses          : 1,
+        uint32_t virtualize_apic_accesses           : 1,
                  enable_ept                         : 1,
                  descriptor_table_exiting           : 1,
                  enable_rdtscp                      : 1,

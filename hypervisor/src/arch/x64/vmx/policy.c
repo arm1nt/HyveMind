@@ -166,6 +166,9 @@ init_vmx_capabilities(void)
         min_proc_ctls2.raw = 0;
         min_proc_ctls2.enable_ept = 1;
         min_proc_ctls2.unrestricted_guest = 1;
+        min_proc_ctls2.enable_invpcid = 1;
+        min_proc_ctls2.enable_rdtscp = 1;
+        min_proc_ctls2.virtualize_apic_accesses = 1;
 
         vmx_caps.proc_ctls2 = set_reserved_procbased_ctls2(min_proc_ctls2);
         if ((vmx_caps.proc_ctls2.raw & min_proc_ctls2.raw) != min_proc_ctls2.raw) {

@@ -165,8 +165,11 @@ configure_linux_32bit_policy(struct vmx_virt_policy *policy)
     init_default_virt_policy(policy);
 
     policy->proc_ctls1.activate_secondary_controls = 1;
+    policy->proc_ctls1.msr_bitmaps = 1;
+    policy->proc_ctls2.enable_invpcid = 1;
     policy->proc_ctls2.enable_ept = 1;
     policy->proc_ctls2.unrestricted_guest = 1;
+    policy->proc_ctls2.enable_rdtscp = 1;
 
     policy->exit_ctls1.host_addr_space_size = 1;
     policy->exit_ctls1.load_ia32_efer = 1;
