@@ -54,10 +54,8 @@ struct ept_mapping_info {
     uint64_t req_bytes;
     int64_t offset;
 
-    uint64_t pml4e_flags;
-    uint64_t pdpte_flags;
-    uint64_t pde_flags;
-    uint64_t pte_flags;
+    uint64_t no_page_flags;
+    uint64_t page_map_flags;
 
     bool use_gb_mappings;
     bool use_mb_mappings;
@@ -85,7 +83,7 @@ try_use_gb_mappings(struct ept_mapping_info *info)
     bool supported = false;
     const uint64_t ept_cap_msr = read_msr(MSRX64_IA32_VMX_EPT_VPID_CAP);
 
-    if (IS_SET(ept_cap_msr, EPT_VPID_CAP_GB_PAGES_BIT)) {
+    if (IS_SET(ept_cap_msr, U64_LSHIFT(1, EPT_VPID_CAP_GB_PAGES_BIT))) {
         supported = true;
     }
 
@@ -98,12 +96,19 @@ try_use_mb_mappings(struct ept_mapping_info *info)
     bool supported = false;
     const uint64_t ept_cap_msr = read_msr(MSRX64_IA32_VMX_EPT_VPID_CAP);
 
-    if (IS_SET(ept_cap_msr, EPT_VPID_CAP_MB_PAGES_BIT)) {
+    if (IS_SET(ept_cap_msr, U64_LSHIFT(1, EPT_VPID_CAP_MB_PAGES_BIT))) {
         supported = true;
     }
 
     info->use_mb_mappings = supported;
 }
+
+enum ept_error {
+    EPT_SUCCESS,
+    EPT_RANGE_ALREADY_MAPPED,
+    EPT_PARTS_OF_RANGE_ALREADY_MAPPED,
+    EPT_ERROR,
+};
 
 int create_ept_mapping(eptp_t *eptp, const struct ept_mapping_info *info);
 int add_ept_mapping(const eptp_t *eptp, const struct ept_mapping_info *info);

@@ -131,7 +131,7 @@ ept_pml4e_set_paddr(ept_pml4e *pml4e, const phys_addr_t paddr)
 static inline void
 ept_pdpte_set_pf_paddr(ept_pdpte *pdpte, const phys_addr_t paddr)
 {
-    die_reason("ept pdpte set pf paddr not yet implemented");
+    pdpte->pdpte_page.paddr = ((paddr & MAX_PHYS_ADDR) >> 30) << 18;
 }
 
 static inline void
@@ -143,7 +143,7 @@ ept_pdpte_set_paddr(ept_pdpte *pdpte, const phys_addr_t paddr)
 static inline void
 ept_pde_set_pf_paddr(ept_pde *pde, const phys_addr_t paddr)
 {
-    die_reason("ept pde set pf paddr not yet implemented");
+    pde->pde_page.paddr = ((paddr & MAX_PHYS_ADDR) >> 20) << 9;
 }
 
 static inline void
@@ -179,8 +179,7 @@ ept_pdpte_read_paddr(const ept_pdpte *pdpte)
 static inline phys_addr_t
 ept_pdpte_read_pf_paddr(const ept_pdpte *pdpte)
 {
-    die_reason("ept pdpte read pf addr not yet implemented");
-    return 0;
+    return pdpte->pdpte_page.paddr << PAGE_SHIFT;
 }
 
 static inline phys_addr_t
@@ -192,8 +191,7 @@ ept_pde_read_paddr(const ept_pde *pde)
 static inline phys_addr_t
 ept_pde_read_pf_paddr(const ept_pde *pde)
 {
-    die_reason("ept pde read pf paddr not yet implemented");
-    return 0;
+    return pde->pde_page.paddr << PAGE_SHIFT;
 }
 
 static inline bool
@@ -210,11 +208,14 @@ is_ept_entry_present(const uint64_t raw_entry)
     return (!lower_bits_zero) || bit10_set;
 }
 
+#define EPT_MAPS_PAGE           (U64_LSHIFT(1, 7))
 #define EPT_READ_ACCS_FLAG      (U64_LSHIFT(1, 0))
 #define EPT_WRITE_ACCS_FLAG     (U64_LSHIFT(1, 1))
 #define EPT_RW_FLAG             (EPT_READ_ACCS_FLAG | EPT_WRITE_ACCS_FLAG)
 #define EPT_EXECUTE_ACCS_FLAG   (U64_LSHIFT(1, 2))
+#define EPT_RWX                 (EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG)
 #define EPT_MEM_TYPE_WB_FLAG    (U64_LSHIFT(6, 3))
+#define EPT_MEM_TYPE_UC_FLAG    (U64_LSHIFT(0, 3))
 
 #endif /* _HYVEMIND_X64_VMX_EPT_TYPES_H */
 
