@@ -2,7 +2,18 @@
 #define _HYVEMIND_X64_VMX_EPT_H
 
 #include "string.h"
+#include "asm/cpufeatures.h"
+#include "asm/processor.h"
 #include "vmx/ept_types.h"
+
+#define EPT_PML4_INDEX_VADDR_START_POS  39
+#define EPT_PML4_INDEX_VADDR_END_POS    47
+#define EPT_PDPT_INDEX_VADDR_START_POS  30
+#define EPT_PDPT_INDEX_VADDR_END_POS    38
+#define EPT_PDT_INDEX_VADDR_START_POS   21
+#define EPT_PDT_INDEX_VADDR_END_POS     29
+#define EPT_PT_INDEX_VADDR_START_POS    12
+#define EPT_PT_INDEX_VADDR_END_POS      20
 
 static inline uint64_t
 __get_ept_xtable_block_end(const uint64_t addr, const int mask_bits)
@@ -11,11 +22,14 @@ __get_ept_xtable_block_end(const uint64_t addr, const int mask_bits)
     return block_end;
 }
 
-/* todo: define macros for the mask bit nrs */
-#define get_ept_pml4e_block_end(addr)   __get_ept_xtable_block_end(addr, 39)
-#define get_ept_pdpte_block_end(addr)   __get_ept_xtable_block_end(addr, 30)
-#define get_ept_pd_block_end(addr)     __get_ept_xtable_block_end(addr, 21)
-#define get_ept_pt_block_end(addr)     __get_ept_xtable_block_end(addr, 12)
+#define get_ept_pml4e_block_end(addr)   \
+    __get_ept_xtable_block_end(addr, EPT_PML4_INDEX_VADDR_START_POS)
+#define get_ept_pdpte_block_end(addr)   \
+    __get_ept_xtable_block_end(addr, EPT_PDPT_INDEX_VADDR_START_POS)
+#define get_ept_pd_block_end(addr)      \
+    __get_ept_xtable_block_end(addr, EPT_PDT_INDEX_VADDR_START_POS)
+#define get_ept_pt_block_end(addr)      \
+    __get_ept_xtable_block_end(addr, EPT_PT_INDEX_VADDR_START_POS)
 
 /**
  * @msb_pos ... bit index of the highest bit part of the index calculation
@@ -26,11 +40,14 @@ __get_ept_xentry_index(const uint64_t addr, const int msb_pos)
     return (addr << (63 - msb_pos)) >> 55;
 }
 
-/* also define macros for the nrs */
-#define get_ept_pml4_index(addr)    __get_ept_xentry_index(addr, 47)
-#define get_ept_pdpt_index(addr)    __get_ept_xentry_index(addr, 38)
-#define get_ept_pd_index(addr)      __get_ept_xentry_index(addr, 29)
-#define get_ept_pt_index(addr)      __get_ept_xentry_index(addr, 20)
+#define get_ept_pml4_index(addr)    \
+    __get_ept_xentry_index(addr, EPT_PML4_INDEX_VADDR_END_POS)
+#define get_ept_pdpt_index(addr)    \
+    __get_ept_xentry_index(addr, EPT_PDPT_INDEX_VADDR_END_POS)
+#define get_ept_pd_index(addr)      \
+    __get_ept_xentry_index(addr, EPT_PDT_INDEX_VADDR_END_POS)
+#define get_ept_pt_index(addr)      \
+    __get_ept_xentry_index(addr, EPT_PT_INDEX_VADDR_END_POS)
 
 struct ept_mapping_info {
     gpaddr guest_paddr_start;
@@ -57,7 +74,6 @@ create_ept_mapping_info(
 
     info.guest_paddr_start = guest_paddr_start;
     info.req_bytes = req_bytes;
-
     info.offset = target_host_paddr - guest_paddr_start;
 
     return info;
@@ -66,24 +82,31 @@ create_ept_mapping_info(
 static inline void
 try_use_gb_mappings(struct ept_mapping_info *info)
 {
-    /**
-     * TODO: Check if gb mappings are supported
-     */
+    bool supported = false;
+    const uint64_t ept_cap_msr = read_msr(MSRX64_IA32_VMX_EPT_VPID_CAP);
 
-    info->use_gb_mappings = false;
+    if (IS_SET(ept_cap_msr, EPT_VPID_CAP_GB_PAGES_BIT)) {
+        supported = true;
+    }
+
+    info->use_gb_mappings = supported;
 }
 
 static inline void
 try_use_mb_mappings(struct ept_mapping_info *info)
 {
-    /**
-     * TODO: check if mb mappings are supported
-     */
-    info->use_mb_mappings = false;
+    bool supported = false;
+    const uint64_t ept_cap_msr = read_msr(MSRX64_IA32_VMX_EPT_VPID_CAP);
+
+    if (IS_SET(ept_cap_msr, EPT_VPID_CAP_MB_PAGES_BIT)) {
+        supported = true;
+    }
+
+    info->use_mb_mappings = supported;
 }
 
-
-int create_ept_mapping(eptp_t *eptp, struct ept_mapping_info *info);
+int create_ept_mapping(eptp_t *eptp, const struct ept_mapping_info *info);
+int add_ept_mapping(const eptp_t *eptp, const struct ept_mapping_info *info);
 
 #endif /* _HYVEMIND_X64_VMX_EPT_H */
 
