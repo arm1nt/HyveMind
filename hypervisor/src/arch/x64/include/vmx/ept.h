@@ -112,6 +112,8 @@ enum ept_error {
 
 int create_ept_mapping(eptp_t *eptp, const struct ept_mapping_info *info);
 int add_ept_mapping(const eptp_t *eptp, const struct ept_mapping_info *info);
+int try_remap_range(eptp_t *eptp, const struct ept_mapping_info *info);
+void destroy_ept_mapping(eptp_t *eptp);
 
 #endif /* _HYVEMIND_X64_VMX_EPT_H */
 

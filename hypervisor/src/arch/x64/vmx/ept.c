@@ -329,6 +329,36 @@ do_ept_pml4_mapping(
     return EPT_SUCCESS;
 }
 
+static void
+destroy_ept_table(const virt_addr_t table_ptr)
+{
+    virt_addr_t descendent_ptr;
+    union ept_entry_no_page *entry;
+
+    for (int i = 0; i < EPT_TABLE_MAX_ENTRIES; i++) {
+        entry = (union ept_entry_no_page *) table_ptr + SCALE_BLOCK_INDEX(i);
+
+        if (is_ept_entry_present(entry->raw) && !ept_entry_maps_page(entry->raw)) {
+            descendent_ptr = phys_to_virt(entry->paddr >> 12);
+            destroy_ept_table(descendent_ptr);
+        }
+    }
+
+    free_page(table_ptr);
+}
+
+void
+destroy_ept_mapping(eptp_t *eptp)
+{
+    phys_addr_t pml4_ptr = eptp_read_paddr(eptp);
+    if (!pml4_ptr) {
+        return;
+    }
+
+    destroy_ept_table(phys_to_virt(pml4_ptr));
+    eptp_set_paddr(eptp, 0);
+}
+
 int
 add_ept_mapping(const eptp_t *eptp, const struct ept_mapping_info *info)
 {

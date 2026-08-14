@@ -8,11 +8,22 @@
 #include "asm/paging.h"
 #include "asm/mm.h"
 
+#define EPT_TABLE_MAX_ENTRIES 512
+
 #define EPT_MEM_TYPE_UC (0)
 #define EPT_MEM_TYPE_WB (6)
 
 #define EPT_PAGE_WALK_LEN_4 (3)
 #define EPT_PAGE_WALK_LEN_5 (4)
+
+#define EPT_MAPS_PAGE           (U64_LSHIFT(1, 7))
+#define EPT_READ_ACCS_FLAG      (U64_LSHIFT(1, 0))
+#define EPT_WRITE_ACCS_FLAG     (U64_LSHIFT(1, 1))
+#define EPT_RW_FLAG             (EPT_READ_ACCS_FLAG | EPT_WRITE_ACCS_FLAG)
+#define EPT_EXECUTE_ACCS_FLAG   (U64_LSHIFT(1, 2))
+#define EPT_RWX                 (EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG)
+#define EPT_MEM_TYPE_WB_FLAG    (U64_LSHIFT(6, 3))
+#define EPT_MEM_TYPE_UC_FLAG    (U64_LSHIFT(0, 3))
 
 union eptp {
     uint64_t raw;
@@ -208,14 +219,11 @@ is_ept_entry_present(const uint64_t raw_entry)
     return (!lower_bits_zero) || bit10_set;
 }
 
-#define EPT_MAPS_PAGE           (U64_LSHIFT(1, 7))
-#define EPT_READ_ACCS_FLAG      (U64_LSHIFT(1, 0))
-#define EPT_WRITE_ACCS_FLAG     (U64_LSHIFT(1, 1))
-#define EPT_RW_FLAG             (EPT_READ_ACCS_FLAG | EPT_WRITE_ACCS_FLAG)
-#define EPT_EXECUTE_ACCS_FLAG   (U64_LSHIFT(1, 2))
-#define EPT_RWX                 (EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG)
-#define EPT_MEM_TYPE_WB_FLAG    (U64_LSHIFT(6, 3))
-#define EPT_MEM_TYPE_UC_FLAG    (U64_LSHIFT(0, 3))
+static inline bool
+ept_entry_maps_page(const uint64_t raw_entry)
+{
+    return raw_entry & EPT_MAPS_PAGE;
+}
 
 #endif /* _HYVEMIND_X64_VMX_EPT_TYPES_H */
 
