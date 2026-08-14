@@ -61,14 +61,16 @@ virtualize_guest_physical_memory(struct vm *vm, const struct guest_config *confi
     }
 
     info = create_ept_mapping_info(0, req_bytes, contig_vm_mem_start);
-    info.pml4e_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
-    info.pdpte_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
-    info.pde_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG;
-    info.pte_flags = EPT_RW_FLAG | EPT_EXECUTE_ACCS_FLAG | EPT_MEM_TYPE_WB_FLAG;
+    info.no_page_flags = EPT_RWX;
+    info.page_map_flags = EPT_MAPS_PAGE | EPT_RWX | EPT_MEM_TYPE_WB_FLAG;
 
-    if (create_ept_mapping(&eptp, &info) != 0) {
+    try_use_mb_mappings(&info);
+    try_use_gb_mappings(&info);
+
+    if (create_ept_mapping(&eptp, &info) != EPT_SUCCESS) {
         pr_error("Failed to create EPT mapping");
         hfree((void *) contig_vm_mem_start);
+        destroy_ept_mapping(&eptp);
         return -1;
     }
 
