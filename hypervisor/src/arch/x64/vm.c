@@ -186,6 +186,7 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
     struct vmx_virt_policy *policy;
     struct vcpu_guest_reg_state guest_state;
     struct linux_load_info load_info;
+    cr4_t cr4_mask, cr4_shadow;
 
     bsp = vm->vcpus[0];
     policy = bsp->arch.hw.vmx.virt_policy;
@@ -195,6 +196,11 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
         pr_error("Configured virt policy is invalid: %lu", U64(ret));
         return -1;
     }
+
+    vmx_get_default_cr4_mask_and_shadow(&cr4_mask.raw, &cr4_shadow.raw);
+    /* Hide VMX enablement */
+    cr4_shadow.vmxe = 0;
+    vmx_set_cr4_mask_and_shadow(bsp, cr4_mask.raw, cr4_shadow.raw);
 
     if (virtualize_guest_physical_memory(vm, config) != 0) {
         pr_error("Failed to create virtualized memory area for the VM");

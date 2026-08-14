@@ -430,6 +430,29 @@ vmx_set_guest_efer(vcpu_t *vcpu, const ia32_efer_t efer)
     clear_vcpu(vcpu);
 }
 
+void
+vmx_get_default_cr4_mask_and_shadow(uint64_t *default_mask, uint64_t *default_shadow)
+{
+    /**
+     * The mask sets all bits that are fixed by vmx-operation as host owned.
+     * In the shadow, we set all host owned bits to the default-required values.
+     */
+    const uint64_t vmx_flexible_cr4_bits = VMX_CR4_FIXED0 ^ VMX_CR4_FIXED1;
+    const uint64_t vmx_fixed_cr4_bits = ~vmx_flexible_cr4_bits;
+
+    *default_mask = vmx_fixed_cr4_bits;
+    *default_shadow = VMX_CR4_FIXED0 & VMX_CR4_FIXED1;
+}
+
+void
+vmx_set_cr4_mask_and_shadow(vcpu_t *vcpu, const uint64_t mask, const uint64_t shadow)
+{
+    ensure_vcpu_current(vcpu);
+    vmwrite(CR4_GUEST_HOST_MASK, mask);
+    vmwrite(CR4_READ_SHADOW, shadow);
+    clear_vcpu(vcpu);
+}
+
 int
 vmx_set_system_table(
         vcpu_t *vcpu,

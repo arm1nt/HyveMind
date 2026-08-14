@@ -22,6 +22,12 @@ int vmx_set_guest_cr0(vcpu_t *vcpu, const cr0_t cr0);
 void vmx_set_guest_cr3(vcpu_t *vcpu, const cr3_t cr3);
 void vmx_set_guest_cr4(vcpu_t *vcpu, const cr4_t cr4);
 
+void vmx_get_default_cr4_mask_and_shadow(
+        uint64_t *default_mask,
+        uint64_t *default_shadow
+);
+void vmx_set_cr4_mask_and_shadow(vcpu_t *vcpu, const uint64_t mask, const uint64_t shadow);
+
 void vmx_set_guest_efer(vcpu_t *vcpu, const ia32_efer_t efer);
 
 int vmx_set_segment_register(
