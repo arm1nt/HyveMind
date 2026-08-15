@@ -3,6 +3,7 @@
 #include "pf_alloc.h"
 #include "printf.h"
 #include "vm.h"
+#include "asm/apic.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
 #include "loader/loader.h"
@@ -118,7 +119,7 @@ static int
 init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
 {
     int ret;
-    vcpu_t *bsp, *ap;
+    vcpu_t *bsp;
     virt_addr_t stack_bot;
     struct vmx_virt_policy *policy;
     struct vcpu_guest_reg_state vcpu_guest_state;
@@ -180,11 +181,37 @@ configure_linux_32bit_policy(struct vmx_virt_policy *policy)
     policy->entry_ctls.load_ia32_efer = 1;
 }
 
+static inline int
+add_lapic_page_to_ept_mapping(struct vm *vm)
+{
+    const phys_addr_t lapic_base = get_lapic_base();
+    struct ept_mapping_info info =
+        create_ept_mapping_info(lapic_base, PAGE_SIZE, lapic_base);
+
+    info.no_page_flags = EPT_RWX;
+    info.page_map_flags = EPT_RWX | EPT_MAPS_PAGE | EPT_MEM_TYPE_UC_FLAG;
+    return add_ept_mapping(&vm->arch_vm.vmx.eptp, &info);
+}
+
+static inline int
+add_permissive_msr_bitmap(struct vm *vm)
+{
+    virt_addr_t msr_bitmap;
+
+    if (get_page_zeroed(&msr_bitmap) != 0) {
+        pr_error("Failed to allocate msr bitmap");
+        return -1;
+    }
+
+    vm->arch_vm.vmx.msr_bitmap_addr = virt_to_phys(msr_bitmap);
+    return 0;
+}
+
 static int
 init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config)
 {
     int ret;
-    vcpu_t *bsp, *ap;
+    vcpu_t *bsp;
     struct vmx_virt_policy *policy;
     struct vcpu_guest_reg_state guest_state;
     struct linux_load_info load_info;
@@ -204,18 +231,28 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
     cr4_shadow.vmxe = 0;
     vmx_set_cr4_mask_and_shadow(bsp, cr4_mask.raw, cr4_shadow.raw);
 
+    if (add_permissive_msr_bitmap(vm) != 0) {
+        pr_error("Failed to allocate permissive msr bitmap");
+        return -1;
+    }
+
     if (virtualize_guest_physical_memory(vm, config) != 0) {
         pr_error("Failed to create virtualized memory area for the VM");
         return -1;
     }
 
-    if (load_linux_32bit_direct_boot_for_vm(vm, config, &load_info) != 0) {
-        pr_error("Failed to load & setup kernel for the guest");
+    if (add_lapic_page_to_ept_mapping(vm) != 0) {
+        pr_error("Failed to add lapic page mapping to VMs EPT structures");
         return -1;
     }
 
     if (vmx_initialize_vmcs_area(bsp) != 0) {
         pr_error("Failed to initialize linux guest bsp's VMCS area");
+        return -1;
+    }
+
+    if (load_linux_32bit_direct_boot_for_vm(vm, config, &load_info) != 0) {
+        pr_error("Failed to load & setup kernel for the guest");
         return -1;
     }
 
@@ -238,6 +275,8 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
 int
 arch_init_vm(struct vm *vm, const struct guest_config *config)
 {
+    vm->arch_vm.vmx.ops = emulate_ops;
+
     switch (config->guest_type) {
         case LINUX_DIRECT_BOOT_32BIT:
             return init_vm_linux_direct_boot_32bit(vm, config);

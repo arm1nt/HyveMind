@@ -5,6 +5,11 @@
 #include "asm/processor.h"
 #include "asm/pgtables.h"
 
+/**
+ *  Theoretically, needs a pretty big refactoring and enhancements. But since
+ *  we don't yet emulate the lapic to guests, its not yet necessary.
+ */
+
 enum x2apic_register_msr {
     X2APIC_LAPIC_ID_REGISTER            = 0x802,
     X2APIC_TPR                          = 0x808,
@@ -308,29 +313,26 @@ x2apic_setup_local_apic(void)
     return true;
 }
 
-static inline bool
-xapic_setup_local_apic(void)
+bool
+map_lapic_page(void)
 {
-    /**
-     * We mainly focus on x2apic mode, especially since xapic mode is being
-     * deprecated.
-     */
     const phys_addr_t lapic_base = get_lapic_base();
     if (identity_map_mmio_page(lapic_base) != 0) {
-        pr_error("Unable to map lapic page");
+        pr_warn("Failed to map lapic page into addr space");
         return false;
     }
+    return true;
+}
 
-    return false;
+bool
+__setup_x2apic(void)
+{
+    return x2apic_setup_local_apic();
 }
 
 bool
 setup_local_apic(void)
 {
-    if (x2apic_mode_supported()) {
-        return x2apic_setup_local_apic();
-    } else {
-        return xapic_setup_local_apic();
-    }
+    return __setup_x2apic();
 }
 

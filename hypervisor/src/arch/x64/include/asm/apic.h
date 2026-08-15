@@ -93,6 +93,8 @@ enum dcr_value {
 };
 
 bool setup_local_apic(void);
+bool __setup_x2apic(void);
+bool map_lapic_page(void);
 
 void apic_software_enable(void);
 void apic_software_disable(void);

@@ -243,8 +243,8 @@ __arch_setup_bsp(void)
         die_reason("Logical processor cannot support hyvemind operation");
     }
 
-    if (!setup_local_apic()) {
-        die_reason("Failed to setup the local apic");
+    if (!map_lapic_page()) {
+        die_reason("Failed to map lapic page for BSP");
     }
 
     query_processor_max_leaf_values();
@@ -288,10 +288,6 @@ arch_setup_ap(void)
 {
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
-
-    if (!setup_local_apic()) {
-        die_reason("Failed to setup local apic");
-    }
 
     query_processor_max_leaf_values();
 

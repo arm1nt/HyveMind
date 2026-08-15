@@ -10,6 +10,7 @@
 #include "asm/paging.h"
 #include "asm/processor.h"
 #include "asm/vmm.h"
+#include "vmx/emulate.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
 #include "vmx/vmcs.h"
@@ -265,6 +266,9 @@ vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code)
     event_id.vector = vector;
 
     switch (vector) {
+        case IRQ_UD_VECTOR:
+            /* No error code */
+            break;
         case IRQ_GP_VECTOR:
         default:
             event_id.error_code = 1;
@@ -296,6 +300,7 @@ setup_host_ctrl_registers(void)
 
     cr4.raw = read_cr4();
     cr4.pae = 1;
+    cr4.osxsave = 1;
     cr4 = sanitize_cr4_for_vmx_operation(cr4);
     vmwrite(HOST_CR4, cr4.raw);
 }
@@ -707,10 +712,11 @@ extern int asm_do_vmx_vcpu_entry(
 bool
 __vmx_entry_helper(vcpu_t *vcpu)
 {
-    vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
-    vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
-    vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
-    return true;
+    int ret = VMX_OP_SUCCESS;
+    ret |= vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
+    ret |= vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
+    ret |= vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
+    return ret == VMX_OP_SUCCESS;
 }
 
 int
@@ -742,32 +748,41 @@ vmx_vm_exit_handler(struct vcpu_user_regs *regs)
 {
     uint64_t exit_reason_raw;
     vmcs_exit_reason_t exit_reason;
+    vcpu_t *vcpu = current_vcpu;
+    const struct x86_emulate_ops *emu_ops = &vcpu->vm->arch_vm.vmx.ops;
+
+    current_vcpu->arch.hw.vmx.launch_state = VMCS_LS_LAUNCHED;
 
     vmread(GUEST_RIP, &regs->rip);
     vmread(GUEST_RSP, &regs->rsp);
     vmread(GUEST_RFLAGS, &regs->rflags);
 
-    current_vcpu->arch.hw.vmx.launch_state = VMCS_LS_LAUNCHED;
-
     vmread(EXIT_REASON, &exit_reason_raw);
     exit_reason.raw = exit_reason_raw;
 
-    /**
-     * TODO: Create an emlation struct with function pointers to actual handlers,
-     * e.g. vcpu->emulate.cpuid(), and default impls.
-     */
+    if (exit_reason.vm_entry_failure) {
+        pr_error("vm entry failed");
+        dump_vmcs();
+        die();
+    }
+
     switch (exit_reason.basic_exit_reason) {
         case EXIT_REASON_CPUID:
-            pr_info("handling cpuid exit");
-            NOT_YET_IMPLEMENTED;
-            /*regs->rip += 1;
-            vmx_enter_vcpu(current_vcpu);*/
+            emu_ops->emulate_cpuid(vcpu, regs);
+            break;
+        case EXIT_REASON_RDMSR_IMPLICIT:
+        case EXIT_REASON_RDMSR_IMMEDIATE:
+            emu_ops->emulate_rdmsr(vcpu, regs);
+            break;
+        case EXIT_REASON_XSETBV:
+            emu_ops->emulate_xsetbv(vcpu, regs);
+            break;
         default:
             dump_vmcs();
             die();
     }
 
-    die_reason("Unreachable");
+    vmx_enter_vcpu(vcpu);
 }
 
 vmx_op_status_t

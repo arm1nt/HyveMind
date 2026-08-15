@@ -7,6 +7,7 @@
 #include "asm/vcpu_guest_reg_state.h"
 #include "asm/x86_defs.h"
 #include "vmx/ept.h"
+#include "vmx/emulate.h"
 #include "vmx/vmcs.h"
 
 struct vm;
@@ -64,6 +65,7 @@ struct arch_vm {
     struct {
         eptp_t eptp;
         phys_addr_t msr_bitmap_addr;
+        struct x86_emulate_ops ops;
     } vmx;
 };
 

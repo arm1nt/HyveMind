@@ -3,6 +3,7 @@
 
 #define IRQ_DIVIDE_ERROR_VECTOR     0x00
 #define IRQ_NMI_VECTOR              0x02
+#define IRQ_UD_VECTOR               0x06
 #define IRQ_DOUBLE_FAULT_VECTOR     0x08
 #define IRQ_GP_VECTOR               0x0d
 #define IRQ_PAGE_FAULT_VECTOR       0x0e
