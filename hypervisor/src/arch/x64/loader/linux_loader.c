@@ -3,12 +3,13 @@
 #include "loader/loader.h"
 #include "loader/linux.h"
 #include "asm/gdt_idt.h"
+#include "asm/paging.h"
 #include "asm/segmentation.h"
 
 /* The default load addresses that we use */
-#define LINUX_GUEST_DEFAULT_GDT_GPADDR                     0x10000
-#define LINUX_GUEST_DEFAULT_COMMAND_LINE_GPADDR            0x20000
-#define LINUX_GUEST_DEFAULT_ZERO_PAGE_GPADDR               0x30000
+#define LINUX_GUEST_DEFAULT_GDT_GPADDR                      0x10000
+#define LINUX_GUEST_DEFAULT_COMMAND_LINE_GPADDR             0x20000
+#define LINUX_GUEST_DEFAULT_ZERO_PAGE_GPADDR                0x30000
 
 static int
 load_32bit_boot_gdt(struct vm *vm, const gpaddr load_addr)
@@ -160,9 +161,10 @@ load_linux_32bit_direct_boot_for_vm(
     virt_addr_t bzImage_start, setup_header_addr, boot_params_raw_addr;
     virt_addr_t pm_kernel_start;
     gpaddr gpaddr_pm_kernel_load_addr;
+    gpaddr initramfs_gpaddr;
     struct setup_header *setup_header;
     struct boot_params *boot_params;
-    const char *command_line = "auto";
+    const char *command_line = "console=ttyS0 earlyprintk=serial nokaslr";
 
     if (config->bzImage_size < SETUP_HEADER_OFFSET + sizeof(struct setup_header)) {
         pr_error("Malformed bzImage provided. The image is too small to contain "
@@ -277,6 +279,30 @@ load_linux_32bit_direct_boot_for_vm(
         return -1;
     }
 
+    /**
+     * Here we only support non-relocated kernels where the runtime start address
+     * is 'pref_address'.
+     */
+    initramfs_gpaddr =  setup_header->pref_address + effective_pm_kernel_load_size + 1;
+    initramfs_gpaddr = align_forward(initramfs_gpaddr, PAGE_SIZE);
+
+    ret = vm_memory_contig_range_fits(vm, initramfs_gpaddr, config->initramfs_size);
+    if (!ret) {
+        pr_error("VM does not have sufficient memory to store the initramfs image");
+        return -1;
+    }
+
+    ret = copy_to_vm_gpaddr(
+            vm,
+            initramfs_gpaddr,
+            (void *) config->initramfs_addr,
+            config->initramfs_size
+    );
+    if (ret != 0) {
+        pr_error("Failed to copy the initramfs image into the VM memory");
+        return -1;
+    }
+
     if (load_32bit_boot_gdt(vm, LINUX_GUEST_DEFAULT_GDT_GPADDR) != 0) {
         pr_error("Failed to load default linux boot GDT into guest memory");
         return -1;
@@ -317,6 +343,8 @@ load_linux_32bit_direct_boot_for_vm(
     boot_params->hdr.type_of_loader = 0xFF;
     boot_params->hdr.loadflags &= ~(SETUP_LOADFLAGS_CAN_USE_HEAP);
     boot_params->hdr.cmd_line_ptr = LINUX_GUEST_DEFAULT_COMMAND_LINE_GPADDR;
+    boot_params->hdr.ramdisk_image = initramfs_gpaddr;
+    boot_params->hdr.ramdisk_size = config->initramfs_size;
 
     /**
      * Atm we don't simulate any memory holes, but represent the kernel with
