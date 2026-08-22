@@ -17,42 +17,32 @@ $(BUILD_DEPS_LOCATION)/edk2-ovmf/.installed:
 		| tar -C $(BUILD_DEPS_LOCATION) -zxf -
 	$(Q)touch $@
 
-QEMUFLAGS :=
+QEMU_FLAGS = -cpu host,+vmx,+x2apic,+invtsc \
+			 -enable-kvm \
+			 -nic none \
+			 -no-reboot \
+			 -no-shutdown \
+			 -nographic \
+			 -smp 1 \
+			 -m 15G \
+			 -s
 
 ifdef QEMU_GDB_DEBUG
-	QEMUFLAGS += -S
+	QEMU_FLAGS += -S
 endif
 
 PHONY += qemu_run_iso_uefi
 qemu_run_iso_uefi: qemu_get_ovmf gen_iso_image
 	$(Q)echo "Starting $(NAME)..."
-	$(Q)qemu-system-x86_64 \
-		-cpu host,+vmx,+x2apic \
-		-enable-kvm \
-		-no-reboot \
-		-no-shutdown \
-		-nographic \
-		-smp 1 \
-		-m 15G \
+	$(Q)qemu-system-x86_64 $(QEMU_FLAGS) \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
 		-cdrom $(TARGET_ISO) \
-		-boot d \
-		-s \
-		$(QEMUFLAGS)
+		-boot d
 
 PHONY += qemu_run_hdd_uefi
 qemu_run_hdd_uefi: qemu_get_ovmf gen_hdd_image
 	$(Q)echo "Starting $(NAME)..."
-	$(Q)qemu-system-x86_64 \
-		-cpu host,+vmx,+x2apic \
-		-enable-kvm \
-		-no-reboot \
-		-no-shutdown \
-		-nographic \
-		-smp 1 \
-		-m 15G \
+	$(Q)qemu-system-x86_64 $(QEMU_FLAGS) \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILD_DEPS_LOCATION)/edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
-		-hda $(TARGET_HDD) \
-		-s \
-		$(QEMUFLAGS)
+		-hda $(TARGET_HDD)
 
