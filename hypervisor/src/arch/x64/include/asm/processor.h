@@ -175,5 +175,17 @@ disable_local_interrupts(void)
     asm volatile ("cli");
 }
 
+#define cpu_relax() do { asm volatile ("pause"); } while(0)
+
+static inline uint64_t
+read_tsc_raw(void)
+{
+    uint32_t eax, edx;
+
+    asm volatile ("rdtsc" : "=a"(eax), "=d"(edx));
+
+    return U64_LSHIFT(edx, 32) | eax;
+}
+
 #endif /* _HYVEMIND_X64_ASM_PROCESSOR_H */
 
