@@ -115,6 +115,11 @@ check_cpu(void)
         return false;
     }
 
+    if (!cpuid_extended_leafs_supported()) {
+        pr_error("The processor does not support extended cpuid leafs");
+        return false;
+    }
+
     if (!all_cpu_features_supported()) {
         pr_error("Not all required CPU features are supported");
         return false;

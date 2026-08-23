@@ -99,6 +99,28 @@ DECLARE_PER_CPU(uint32_t, cpuid_max_extended_leaf);
 /* Marker to indicate when the ecx value is irrelevant */
 #define NO_SUBLEAF_INDEX 0
 
+static inline bool
+cpuid_extended_leafs_supported(void)
+{
+    asm goto (
+        "movl $0x80000000, %%eax\n\t"
+        "movl $0x00, %%ecx\n\t"
+        "cpuid\n\t"
+        "test $0x80000000, %%eax\n\t"
+        "jnz %l[ext_leafs_supported]\n\t"
+        "jmp %l[ext_leafs_not_supported]"
+        :
+        :
+        : "rax", "rbx",  "rcx", "rdx", "cc"
+        : ext_leafs_supported,  ext_leafs_not_supported
+    );
+
+ext_leafs_supported:
+    return true;
+ext_leafs_not_supported:
+    return false;
+}
+
 struct cpuid_result {
     uint32_t eax;
     uint32_t ebx;
