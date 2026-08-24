@@ -7,6 +7,9 @@
 #include "asm/processor.h"
 #include "drivers/hpet.h"
 
+#undef PRINT_PREFIX_NAME
+#define PRINT_PREFIX_NAME "hpet"
+
 /**
  * Qemu usually maps the HPET registers to this address. Until we implement ACPI
  * support, we'll require/except a HPET to be at this location.
