@@ -1,9 +1,9 @@
 #ifndef _HYVEMIND_X64_ASM_PROCESSOR_H
 #define _HYVEMIND_X64_ASM_PROCESSOR_H
 
-#include "cpufeatures.h"
 #include "types.h"
 #include "per-cpu.h"
+#include "asm/cpufeatures.h"
 #include "asm/x86_defs.h"
 
 #define ACCESS_CONTROL_REGISTER(reg)                        \
@@ -26,18 +26,10 @@ ACCESS_CONTROL_REGISTER(cr8)
 static inline uint64_t
 read_msr(const uint64_t msr_nr)
 {
-    uint32_t edx;
-    uint32_t eax;
-
-    asm volatile(
-        "rdmsr"
-        : "=a"(eax), "=d"(edx)
-        : "c"(msr_nr)
-    );
-
+    uint32_t edx, eax;
+    asm volatile("rdmsr" : "=a"(eax), "=d"(edx) : "c"(msr_nr));
     /* edx || eax */
-    const uint64_t recombined = ((U64(0) | edx) << 32) | eax;
-    return recombined;
+    return U64_LSHIFT(edx, 32) | eax;
 }
 
 static inline void
@@ -200,12 +192,10 @@ disable_local_interrupts(void)
 #define cpu_relax() do { asm volatile ("pause"); } while(0)
 
 static inline uint64_t
-read_tsc_raw(void)
+read_tsc(void)
 {
     uint32_t eax, edx;
-
     asm volatile ("rdtsc" : "=a"(eax), "=d"(edx));
-
     return U64_LSHIFT(edx, 32) | eax;
 }
 

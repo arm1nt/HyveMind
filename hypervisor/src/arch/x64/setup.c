@@ -7,6 +7,7 @@
 #include "asm/mm.h"
 #include "asm/pgtables.h"
 #include "asm/setup.h"
+#include "asm/timer.h"
 #include "asm/vmm.h"
 #include "vmx/vmx.h"
 
@@ -246,6 +247,10 @@ __arch_setup_bsp(void)
 {
     if (check_cpu() == false) {
         die_reason("Logical processor cannot support hyvemind operation");
+    }
+
+    if (init_timer() != TIMER_SUCCESS) {
+        die_reason("Failed to initialize timer");
     }
 
     if (!map_lapic_page()) {

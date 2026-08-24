@@ -14,6 +14,8 @@
 #define CPUID_EXTENDED_RANGE_LIMITS_LEAF        0x80000000
 #define CPUID_BRAND_STRING_LEAF                 0x00
 #define CPUID_CPU_FEATURES_LEAF                 0x01
+#define CPUID_CPU_VERSION_LEAF                  0x01
+#define CPUID_TSC_CRYSTAL_CLOCK_LEAF            0x15
 #define CPUID_PAGE_1GB_LEAF                     0x80000001
 #define CPUID_MAX_PHYS_ADDR_LEAF                0x80000008
 #define CPUID_MAX_APIC_ADDR_LEAF                0x80000008
@@ -28,6 +30,11 @@
 #define CPUID_X2APIC_MODE                       (U32(1) << CPUID_X2APIC_MODE_BIT)
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
+
+#define CPUID_MODEL_ID_SHIFT    0x04
+#define CPUID_MODEL_ID_MASK     0x0F
+#define CPUID_FAMILY_ID_SHIFT   0x08
+#define CPUID_FAMILY_ID_MASK    0x0F
 
 /******************************************************************************
  * EFLAGS related constants
@@ -63,6 +70,8 @@
 /******************************************************************************
  * General MSR related constants
 ******************************************************************************/
+
+#define MSR_PLATFORM_INFO   0x0CE
 
 enum general_msr {
     MSR_IA32_EFER                   = 0xC0000080,
@@ -153,9 +162,6 @@ enum vmx_ept_vpid_cap_msr_bit_pos {
     EPT_VPID_CAP_ACCESSED_DIRTY_BIT             = 21,
     EPT_VPID_CAP_ADVANCED_EPT_VIOLATIONS_BIT    = 22,
 };
-
-//#define VMX_BASIC_REV_ID_LEN        31
-//#define VMX_BASIC_REV_ID_MASK       U64_X_LSBS_SET(VMX_BASIC_REV_ID_LEN)
 
 #endif /* _HYVEMIND_X64_ASM_CPUFEATURES_H */
 

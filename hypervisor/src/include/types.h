@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef __uint128_t uint128_t;
+
 #define U8(val)     ((uint8_t)  (val))
 #define U16(val)    ((uint16_t) (val))
 #define U32(val)    ((uint32_t) (val))

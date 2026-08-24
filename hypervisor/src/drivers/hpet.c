@@ -3,7 +3,6 @@
  * fallback to compute the TSC frequency if necessary, for nothing else.
  */
 #include "printf.h"
-#include "asm/timer.h"
 #include "asm/pgtables.h"
 #include "asm/processor.h"
 #include "drivers/hpet.h"
@@ -29,7 +28,6 @@
 
 #define NTH_TIMER_CONFIG_REG(nr) ((0x20 * (nr)) + 0x100)
 
-#define HPET_MIN_TICK_GRANULARITY_NS    100
 #define HPET_MIN_CLOCK_PERIOD           1
 #define HPET_MAX_CLOCK_PERIOD           0x05F5E100
 
@@ -64,12 +62,12 @@ void
 hpet_do_busy_sleep(const uint64_t time_ns)
 {
     const uint64_t start_counter = hpet_readq(HPET_MAIN_COUNTER_REG);
-    const uint64_t ticks_per_100ns = hpet_hz / 10000000;
-    const uint64_t req_ticks = (time_ns * ticks_per_100ns) / HPET_MIN_TICK_GRANULARITY_NS;
-    const uint64_t target_counter = start_counter + req_ticks;
+    /* Rounding up so that we never wait shorter than the specified time */
+    const uint64_t req_ticks =
+        ((((uint128_t)time_ns * hpet_hz) + 999999999) / U64(1000000000));
 
-    /* Safe even for overflows since we simply count until the wrapped around value */
-    while (hpet_readq(HPET_MAIN_COUNTER_REG) < target_counter) {
+    /* Safe even for overflows since we basically compute modulo the type size */
+    while ((hpet_readq(HPET_MAIN_COUNTER_REG) - start_counter) < req_ticks) {
         cpu_relax();
     }
 }
