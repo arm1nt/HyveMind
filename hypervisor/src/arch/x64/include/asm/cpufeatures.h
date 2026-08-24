@@ -17,9 +17,14 @@
 #define CPUID_CPU_VERSION_LEAF                  0x01
 #define CPUID_TSC_CRYSTAL_CLOCK_LEAF            0x15
 #define CPUID_PAGE_1GB_LEAF                     0x80000001
+#define CPUID_EXTENDED_FUNCTION_INFO1           0x80000007
 #define CPUID_MAX_PHYS_ADDR_LEAF                0x80000008
 #define CPUID_MAX_APIC_ADDR_LEAF                0x80000008
 
+#define CPUID_TSC_BIT                           4 /* cpuid_result.edx */
+#define CPUID_TSC                               U32_LSHIFT(1, CPUID_TSC_BIT)
+#define CPUID_INV_TSC_BIT                       8 /* cpuid_result.edx */
+#define CPUID_INV_TSC                           U32_LSHIFT(1, CPUID_INV_TSC_BIT)
 #define CPUID_VMX_BIT                           5 /* cpuid_result.ecx */
 #define CPUID_VMX                               (U32(1) << CPUID_VMX_BIT)
 #define CPUID_MSR_BIT                           5 /* cpuid_result.edx */

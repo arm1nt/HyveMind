@@ -100,6 +100,27 @@ all_cpu_features_supported(void)
         return false;
     }
 
+    if (IS_CLEAR(result.edx, CPUID_TSC)) {
+        pr_error("TSC not available");
+        return false;
+    }
+
+    if (!cpuid_leaf_in_range(CPUID_EXTENDED_FUNCTION_INFO1)) {
+        pr_error("The 'extended function info 1' cpuid leaf is required for "
+                 "checking processor state, but its not present"
+        );
+        return false;
+    }
+
+    result = cpuid_raw(CPUID_EXTENDED_FUNCTION_INFO1, NO_SUBLEAF_INDEX);
+
+    if (IS_CLEAR(result.edx, CPUID_INV_TSC)) {
+        pr_error("The processor lacks support for invariant TSC but that is required "
+                 "by the hypervisor"
+        );
+        return false;
+    }
+
     return true;
 }
 
