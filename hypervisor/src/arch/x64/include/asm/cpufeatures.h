@@ -13,8 +13,10 @@
 #define CPUID_BASE_RANGE_LIMITS_LEAF            0x00
 #define CPUID_EXTENDED_RANGE_LIMITS_LEAF        0x80000000
 #define CPUID_BRAND_STRING_LEAF                 0x00
+#define CPUID_VERSION_FEATURES_LEAF             0x01
 #define CPUID_CPU_FEATURES_LEAF                 0x01
 #define CPUID_CPU_VERSION_LEAF                  0x01
+#define CPUID_EXT_TOPOLOGY_LEAF                 0x0B
 #define CPUID_TSC_CRYSTAL_CLOCK_LEAF            0x15
 #define CPUID_PAGE_1GB_LEAF                     0x80000001
 #define CPUID_EXTENDED_FUNCTION_INFO1           0x80000007
@@ -35,6 +37,10 @@
 #define CPUID_X2APIC_MODE                       (U32(1) << CPUID_X2APIC_MODE_BIT)
 #define CPUID_PAGE_1GB_BIT                      26 /* cpuid_result.eax */
 #define CPUID_PAGE_1GB                          (U32(1) << CPUID_PAGE_1GB_BIT)
+#define CPUID_MCE_BIT                           7 /* cpuid_result.edx */
+#define CPUID_MCE                               U32_LSHIFT(1, CPUID_MCE_BIT)
+#define CPUID_MCA_BIT                           14 /* cpuid_result.edx */
+#define CPUID_MCA                               U32_LSHIFT(1, CPUID_MCA_BIT)
 
 #define CPUID_MODEL_ID_SHIFT    0x04
 #define CPUID_MODEL_ID_MASK     0x0F
@@ -87,6 +93,10 @@ enum general_msr {
 #define IA32_EFER_LME                       U64_LSHIFT(1, IA32_EFER_LME_BIT)
 #define IA32_EFER_LMA_BIT                   10 /* IA-32e mode active */
 #define IA32_EFER_LMA                       U64_LSHIFT(1, IA32_EFER_LMA_BIT)
+
+#define MSR_IA32_MCG_CAP            0x179
+#define MSR_MCG_CAP_MCP_CMCI_P_BIT  10
+#define MSR_MCG_CAP_MCP_CMCI_P      U64_LSHIFT(1, MSR_MCG_CAP_MCP_CMCI_P_BIT)
 
 #define MSRX64_IA32_APIC_BASE               0x1B
 #define MSR_APIC_BASE_EXTD_BIT              10
