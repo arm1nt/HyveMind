@@ -1,8 +1,6 @@
 #ifndef _HYVEMIND_TYPES_H
 #define _HYVEMIND_TYPES_H
 
-/* TODO: rename to 'bitops.h' or similar */
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -12,6 +10,9 @@ typedef __uint128_t uint128_t;
 #define U16(val)    ((uint16_t) (val))
 #define U32(val)    ((uint32_t) (val))
 #define U64(val)    ((uint64_t) (val))
+#define U128(val)   ((uint128_t) (val))
+
+#define CAST_TO(cast_base, val) ((typeof(cast_base))(val))
 
 #define U16_LOWER8(val)     ((val) & ((1 << 8) - 1))
 #define U16_UPPER8(val)     ((val) >> 8)
@@ -22,10 +23,10 @@ typedef __uint128_t uint128_t;
 
 #define U64_X_LSBS_SET(nr) (~(~(U64(0))<<nr))
 
-/* Caller is responsible for correct types */
-#define SET_BIT(val, mask)      (val | mask)
-#define CLEAR_BIT(val, mask)    (val & (~mask))
-#define TOGGLE_BIT(val, bit)    (val ^ mask)
+#define __SET_BITS(val, mask)   ((val) | (mask))
+#define SET_BIT(val, bit_pos)   __SET_BITS(val, CAST_TO(val, 1) << (bit_pos))
+#define __CLEAR_BITS(val, mask) ((val) & ~(mask))
+#define CLEAR_BIT(val, bit_pos) __CLEAR_BITS(val, CAST_TO(val, 1) << (bit_pos))
 
 #define IS_SET(val, mask)       (val & mask)
 #define IS_CLEAR(val, mask)     ((val & mask) == 0)

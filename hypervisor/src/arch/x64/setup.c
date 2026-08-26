@@ -22,13 +22,13 @@ cpuid_supported(void)
     uint64_t temp_rflags;
     const uint64_t orig_rflags = read_rflags();
 
-    write_rflags(SET_BIT(orig_rflags, EFLAGS_ID));
+    write_rflags(__SET_BITS(orig_rflags, EFLAGS_ID));
     temp_rflags = read_rflags();
     if (IS_CLEAR(temp_rflags, EFLAGS_ID)) {
         return false;
     }
 
-    write_rflags(CLEAR_BIT(temp_rflags, EFLAGS_ID));
+    write_rflags(__CLEAR_BITS(temp_rflags, EFLAGS_ID));
     temp_rflags = read_rflags();
     if (IS_SET(temp_rflags, EFLAGS_ID)) {
         return false;
@@ -154,7 +154,7 @@ static inline bool
 enable_vmx_cr4(void)
 {
     const uint64_t cr4 = read_cr4();
-    write_cr4(SET_BIT(cr4, CR4_VMXE));
+    write_cr4(__SET_BITS(cr4, CR4_VMXE));
     return IS_SET(read_cr4(), CR4_VMXE);
 }
 
@@ -184,7 +184,7 @@ enable_ia32_feature_ctrl_vmx_support(void)
          * If the supported feature selection is not yet locked, make sure
          * VMX operation is supported in any case and then lock the selection
          */
-        ftr_ctrl = SET_BIT(
+        ftr_ctrl = __SET_BITS(
                 ftr_ctrl,
                 MSRX64_FTR_CTRL_VMX_IN_SMX
                 | MSRX64_FTR_CTRL_VMX_OUTSIDE_SMX
