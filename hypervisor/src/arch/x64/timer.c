@@ -1,4 +1,7 @@
+#include "fatal.h"
 #include "printf.h"
+#include "types.h"
+#include "asm/apic.h"
 #include "asm/cpu_family.h"
 #include "asm/cpufeatures.h"
 #include "asm/processor.h"
@@ -117,7 +120,7 @@ no_msr_info:
     }
 
     const uint64_t tsc_start = read_tsc();
-    hpet_do_busy_sleep(100000000); /* sleep for 100ms */
+    hpet_do_busy_sleep(ms_to_ns(100));
     const uint64_t tsc_end = read_tsc();
 
     tsc_hz = (tsc_end - tsc_start) * 10;
@@ -129,6 +132,18 @@ out_success:
 out_error:
     pr_error("Unable to determine the TSC frequency");
     return TIMER_ERROR;
+}
+
+void
+arch_do_busy_sleep(const uint64_t time_ns)
+{
+    const uint64_t start_tsc = read_tsc();
+    const uint64_t req_ticks =
+        ((U128(tsc_hz) * time_ns) + (sec_to_ns(1) - 1)) / U64(sec_to_ns(1));
+
+    while ((read_tsc() - start_tsc) < req_ticks) {
+        cpu_relax();
+    }
 }
 
 int
