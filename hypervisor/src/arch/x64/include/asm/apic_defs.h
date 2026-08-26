@@ -16,6 +16,9 @@
 #define APIC_LVT_LINT0_REG      0x350
 #define APIC_LVT_LINT1_REG      0x360
 #define APIC_LVT_ERROR_REG      0x370
+#define APIC_INITIAL_COUNT_REG  0x380
+#define APIC_CURR_COUNT_REG     0x390
+#define APIC_DIV_CONFIG_REG     0x3E0
 
 /* Must be 0, any other value causes a GP */
 #define APIC_EOI_ACK    0x00
@@ -28,6 +31,17 @@ enum apic_timer_type {
     APIC_ONESHOT_TIMER,
     APIC_PERIODIC_TIMER,
     APIC_TSC_DEADLINE_TIMER,
+};
+
+enum apic_frequency_divisor {
+    APIC_FREQ_DIV_2,
+    APIC_FREQ_DIV_4,
+    APIC_FREQ_DIV_8,
+    APIC_FREQ_DIV_16,
+    APIC_FREQ_DIV_32,
+    APIC_FREQ_DIV_64,
+    APIC_FREQ_DIV_128,
+    APIC_FREQ_DIV_1,
 };
 
 #define APIC_SVR_RESET_VAL  0xFF

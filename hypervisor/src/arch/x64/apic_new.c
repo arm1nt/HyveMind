@@ -1,11 +1,13 @@
 #include "fatal.h"
 #include "mm_types.h"
 #include "per-cpu.h"
-#include "asm/apic_new.h"
+#include "timer.h"
+#include "asm/apic.h"
 #include "asm/apic_defs.h"
 #include "asm/irq_vectors.h"
 #include "asm/pgtables.h"
-#include "asm/timer.h"
+
+DEFINE_PER_CPU(uint64_t, apic_hz);
 
 static inline uint64_t
 __x2apic_msr_read(const unsigned int reg)
@@ -56,11 +58,14 @@ apic_read(const unsigned int reg)
     }
 }
 
+#define __mask_lvt_entry(entry) SET_BIT(entry, APIC_LVT_MASK_BIT)
+#define __unmask_lvt_entry(entry) CLEAR_BIT(entry, APIC_LVT_MASK_BIT)
+
 static inline void
 mask_lvt_entry(const int reg)
 {
     uint32_t lvt_entry = apic_read(reg);
-    lvt_entry |= U32_LSHIFT(1, APIC_LVT_MASK_BIT);
+    lvt_entry = __mask_lvt_entry(lvt_entry);
     apic_write(reg, lvt_entry);
 }
 
@@ -72,6 +77,13 @@ set_lvt_vector(const int reg, const uint8_t vector)
     uint32_t lvt_entry = apic_read(reg);
     lvt_entry = __set_lvt_vector(lvt_entry, vector);
     apic_write(reg, lvt_entry);
+}
+
+static inline void
+set_divide_config_register(const enum apic_frequency_divisor freq_div)
+{
+    const uint32_t val = (freq_div >= 4) ? freq_div+4 : freq_div;
+    apic_write(APIC_DIV_CONFIG_REG, val);
 }
 
 static inline void
@@ -95,15 +107,31 @@ apic_program_tsc_deadline_timer(void)
 }
 
 int
-apic_program_oneshot_timer(void)
-{
+apic_program_oneshot_timer(
+        const uint64_t initial_count,
+        const enum apic_frequency_divisor freq_div
+) {
     NOT_YET_IMPLEMENTED;
 }
 
 static void
 determine_apic_timer_frequency(void)
 {
-    NOT_YET_IMPLEMENTED;
+    configure_timer_lvt(APIC_ONESHOT_TIMER);
+    mask_lvt_entry(APIC_LVT_TIMER_REG);
+    set_divide_config_register(APIC_FREQ_DIV_1);
+
+    apic_write(APIC_INITIAL_COUNT_REG, ~U32(0));
+
+    do_busy_sleep(ms_to_ns(100));
+
+    const uint32_t curr_count = apic_read(APIC_CURR_COUNT_REG);
+    apic_write(APIC_INITIAL_COUNT_REG, 0);
+
+    const uint64_t delta = U64(~U32(0)) - curr_count;
+
+    set_percpu_val(apic_hz, delta * 10);
+    pr_info("apic timer runs at %lu HZ", percpu_val(apic_hz));
 }
 
 static inline void
@@ -230,9 +258,7 @@ setup_bsp_apic(void)
     set_task_priority_class(TP_CLASS_1);
     sw_enable_lapic();
 
-    /* TODO: compute timer frequency */
-
-    NOT_YET_IMPLEMENTED;
+    determine_apic_timer_frequency();
 
     return APIC_SUCCESS;
 }
