@@ -184,6 +184,20 @@ enable_local_interrupts(void)
 }
 
 static inline void
+restore_irq_status(const uint64_t status)
+{
+    asm volatile ("push %0; popfq" :: "r"(status));
+}
+
+static inline uint64_t
+disable_irq_save_status(void)
+{
+    uint64_t status;
+    asm volatile("pushfq; cli; pop %0" : "=r"(status));
+    return status;
+}
+
+static inline void
 disable_local_interrupts(void)
 {
     asm volatile ("cli");
