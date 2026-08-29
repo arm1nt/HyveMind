@@ -27,6 +27,8 @@
 #define CPUID_TSC                               U32_LSHIFT(1, CPUID_TSC_BIT)
 #define CPUID_INV_TSC_BIT                       8 /* cpuid_result.edx */
 #define CPUID_INV_TSC                           U32_LSHIFT(1, CPUID_INV_TSC_BIT)
+#define CPUID_TSC_DEADLINE_BIT                  24 /* cpuid_result.ecx */
+#define CPUID_TSC_DEADLINE                      U32_LSHIFT(1, CPUID_TSC_DEADLINE_BIT)
 #define CPUID_VMX_BIT                           5 /* cpuid_result.ecx */
 #define CPUID_VMX                               (U32(1) << CPUID_VMX_BIT)
 #define CPUID_MSR_BIT                           5 /* cpuid_result.edx */

@@ -90,6 +90,11 @@ all_cpu_features_supported(void)
         return false;
     }
 
+    if (IS_CLEAR(result.ecx, CPUID_TSC_DEADLINE)) {
+        pr_error("APIC does not support tsc deadline timer mode");
+        return false;
+    }
+
     if (IS_CLEAR(result.edx, CPUID_MSR)) {
         pr_error("The processor does not support the 'rdmsr' and 'wrmsr' instructions");
         return false;
