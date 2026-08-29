@@ -8,6 +8,7 @@
 #include "asm/pgtables.h"
 
 DEFINE_PER_CPU(uint64_t, apic_hz);
+DEFINE_PER_CPU_VAL(bool, tsc_deadline_timer_configured, false);
 
 static inline uint64_t
 __x2apic_msr_read(const unsigned int reg)
@@ -97,13 +98,21 @@ configure_timer_lvt(const enum apic_timer_type timer_type)
     lvt_entry &= timer_mode_clear_mask;
     lvt_entry |= U32_LSHIFT(timer_type, APIC_LVT_TIMER_MODE_POS);
 
+    lvt_entry = __unmask_lvt_entry(lvt_entry);
+
     apic_write(APIC_LVT_TIMER_REG, lvt_entry);
 }
 
 int
-apic_program_tsc_deadline_timer(void)
+apic_program_tsc_deadline_timer(const uint64_t tsc_deadline)
 {
-    NOT_YET_IMPLEMENTED;
+    if (!percpu_val(tsc_deadline_timer_configured)) {
+        configure_timer_lvt(APIC_TSC_DEADLINE_TIMER);
+        set_percpu_val(tsc_deadline_timer_configured, true);
+    }
+
+    write_msr(APIC_TSC_DEADLINE_MSR, tsc_deadline);
+    return APIC_SUCCESS;
 }
 
 int
@@ -130,6 +139,8 @@ determine_apic_timer_frequency(void)
 
     const uint64_t delta = U64(~U32(0)) - curr_count;
     set_percpu_val(apic_hz, delta * 10);
+
+    apic_write(APIC_LVT_TIMER_REG, APIC_LVT_RESET_VAL);
 
     pr_info("apic timer runs at %lu HZ", percpu_val(apic_hz));
 }

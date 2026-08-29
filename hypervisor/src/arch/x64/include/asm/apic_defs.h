@@ -27,6 +27,8 @@
 #define APIC_LVT_MASK_BIT       16
 #define APIC_LVT_TIMER_MODE_POS 17
 
+#define APIC_TSC_DEADLINE_MSR   0x6E0
+
 enum apic_timer_type {
     APIC_ONESHOT_TIMER,
     APIC_PERIODIC_TIMER,

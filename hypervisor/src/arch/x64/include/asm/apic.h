@@ -38,7 +38,7 @@ int apic_send_ipi(void);
 void apic_signal_eoi(void);
 phys_addr_t get_lapic_base(void);
 
-/* TODO: functions to configure timers etc. */
+int apic_program_tsc_deadline_timer(const uint64_t tsc_deadline);
 
 #endif /* _HYVEMIND_X64_ASM_APIC_NEW_H */
 
