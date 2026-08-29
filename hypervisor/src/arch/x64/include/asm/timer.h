@@ -3,13 +3,11 @@
 
 #include "../../../include/timer.h"
 
-enum timer_op_status {
-    TIMER_SUCCESS,
-    TIMER_INIT_FAILED,
-    TIMER_ERROR,
-};
+int arch_init_timer_framework(void);
 
-int init_timer(void);
+uint64_t arch_get_timer_frequency(void);
+
+int arch_reprogram_timer(const uint64_t deadline);
 
 #endif /* _HYVEMIND_X64_ASM_TIMER_H */
 

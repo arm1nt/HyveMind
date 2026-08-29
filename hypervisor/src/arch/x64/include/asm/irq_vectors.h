@@ -9,13 +9,10 @@
 #define IRQ_PAGE_FAULT_VECTOR       0x0e
 #define IRQ_VIRT_VECTOR             0x14
 
-#define APIC_SPURIOUS_VECTOR        0xff
+#define IRQ_APIC_SPURIOUS_VECTOR    0xff
+#define IRQ_APIC_TIMER_VECTOR       0x30
 
-#define APIC_ONESHOT_TIMER_VECTOR   0x30
-#define APIC_PERIODIC_TIMER_VECTOR  0x31
-#define APIC_DEADLINE_TIMER_VECTOR  0x32
-
-#define IRQ_SCHEDULE_VECTOR       0x50
+#define IRQ_SCHED_IPI_VECTOR        0x50
 
 #endif /*  _HYVEMIND_X64_ASM_IRQ_VECTORS_H */
 

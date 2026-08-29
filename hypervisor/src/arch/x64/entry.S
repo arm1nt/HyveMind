@@ -1,3 +1,5 @@
+.section .text
+
 .extern apic_signal_eoi
 
 .macro def_global_function name
@@ -84,8 +86,6 @@
         leave
         iretq
 .endm
-
-.section .text
 
 # Generate the interrupt and exception handler entry points
 #include "asm/idt.h"

@@ -30,7 +30,8 @@
 
 DECLARE_EXCEPTION_HANDLER_WITHOUT_ERR(asm_div_exception_handler, __div_exception_handler)
 
-DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_apic_oneshot_timer_handler, __apic_oneshot_timer_handler)
+DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_apic_timer_handler, irq_timer_handler)
+DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_apic_schedule_ipi_handler, __apic_schedule_ipi_handler)
 
 #endif /* _HYVEMIND_X64_ASM_IDT_H */
 

@@ -6,6 +6,7 @@
 #include "pf_alloc.h"
 #include "phys_mm.h"
 #include "printf.h"
+#include "timer.h"
 #include "vm.h"
 #include "asm/setup.h"
 #include "asm/paging.h"
@@ -80,9 +81,11 @@ hypervisor_main(void)
     }
     pr_debug("Successfully inintialized the memory allocator!");
 
-    arch_bringup_aps_limine(mp_request.response);
-    pr_debug("Initialized APs");
+    if (init_timer_framework() != TIMER_SUCCESS) {
+        die_reason("Failed to initialize timer framework");
+    }
 
+    arch_bringup_aps_limine(mp_request.response);
     /* wait_until_aps_online(); */
 
     const struct guest_config_info guest_info = get_guest_configs(module_request.response);

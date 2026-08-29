@@ -271,16 +271,12 @@ create_addr_space(void)
 void
 __arch_setup_bsp(void)
 {
-    if (check_cpu() == false) {
+    if (!check_cpu()) {
         die_reason("Logical processor cannot support hyvemind operation");
     }
 
-    if (init_timer() != TIMER_SUCCESS) {
-        die_reason("Failed to initialize timer");
-    }
-
-    if (!map_lapic_page()) {
-        die_reason("Failed to map lapic page for BSP");
+    if (setup_bsp_apic() != APIC_SUCCESS) {
+        die_reason("Failed to setup apic for BSP");
     }
 
     query_processor_max_leaf_values();

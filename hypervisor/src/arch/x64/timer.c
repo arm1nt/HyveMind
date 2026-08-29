@@ -1,4 +1,3 @@
-#include "fatal.h"
 #include "printf.h"
 #include "types.h"
 #include "asm/apic.h"
@@ -147,7 +146,24 @@ arch_do_busy_sleep(const uint64_t time_ns)
 }
 
 int
-init_timer(void)
+arch_reprogram_timer(const uint64_t deadline)
+{
+    if (apic_program_tsc_deadline_timer(deadline) != APIC_SUCCESS) {
+        pr_error("Failed to reprogram timer");
+        return TIMER_PROGRAMMING_FAILED;
+    }
+
+    return TIMER_SUCCESS;
+}
+
+uint64_t
+arch_get_timer_frequency(void)
+{
+    return tsc_hz;
+}
+
+int
+arch_init_timer_framework(void)
 {
     if (compute_tsc_frequency() != TIMER_SUCCESS) {
         goto out_error;

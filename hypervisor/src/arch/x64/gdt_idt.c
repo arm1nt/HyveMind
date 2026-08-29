@@ -97,7 +97,7 @@ init_shared_idt(void)
     memset(&idt, 0, sizeof(struct idt_struct));
 
     REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, TSS_IST_NO_IST_STACK);
-    REGISTER_INTERRUPT_GATE(&idt, APIC_ONESHOT_TIMER_VECTOR, asm_irq_apic_oneshot_timer_handler, TSS_IST_INDEX1);
+    REGISTER_INTERRUPT_GATE(&idt, IRQ_APIC_TIMER_VECTOR, asm_irq_apic_timer_handler, TSS_IST_INDEX1);
 }
 
 void
