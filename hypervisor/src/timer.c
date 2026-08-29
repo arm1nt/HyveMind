@@ -162,11 +162,6 @@ heap_add_timer(struct timer_heap *heap, struct timer *timer)
     return TIMER_SUCCESS;
 }
 
-struct deadline_info {
-    uint64_t ticks;
-    uint64_t deadline;
-};
-
 static inline uint64_t
 __get_ticks_from_ns(const uint64_t time_ns)
 {
@@ -283,7 +278,6 @@ irq_timer_handler(void)
         }
     }
 }
-
 
 int
 init_timer_framework(void)
