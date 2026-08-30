@@ -10,32 +10,37 @@ make qemu_run_hdd_uefi QUIET=1 DEBUG_BUILD=1
 
 ### Currently working on:
 
-- Implementing support to directly boot and run Linux `bzImage` kernels via the 32-bit Linux
-x86 boot protocol.
+- Per-vCPU APIC virtualization and vCPU scheduling
 
 ### Completed features:
 
 - Checking CPU capabilities (VMX support, etc.) for the BSP and APs
-- UART driver for serial output
-    - including coloring via ANSI escape sequences
 - Bitmap page-frame allocator
 - Power-of-two freelist heap allocator
 - 4-level paging
-    - replacing boot loader provided page tables with custom tables
-- x2apic initialization
+    - Replacing bootloader-provided page tables with custom tables
 - GDT/IDT/TSS setup
+- UART driver for serial output
+    - Including coloring via ANSI escape sequences
 - Basic spinlock implementation
 - Basic per-cpu variables support
+- xAPIC/x2APIC support
+    - Including support for computing the APIC timer frequency
+- Basic HPET driver to support HPET-based busy sleeping
+- Timer infrastructure
+    - Multiple approaches for determining the TSC frequency
+    - Support for one-shot and periodic timers
+    - Min-heap implementation to manage software timers
 
 *Virtualization specific:*
-- Entering & leaving VMX operation
+
+- Entering & leaving VMX operation on each logical processor
 - Verifying VMX capabilities (e.g. EPT support)
-- Creating and validating VMX policies that specify which features a VM wants to use
-- Initializing VMCS execution control fields
-- Initializing the VMCS host state area
+- Creating and validating VMX policies that specify the features a VM requires
+- Initializing VMCS execution control fields and the VMCS host state area
 - Initializing register & non-register VMCS guest state according to the type of guest
-- Basic VM-entry and VM-exit handlers
-- Creating an EPT mapping for a VM
-    - Copying data into the guest addr space
-- Parsing and validating a `bzImage` kernel image
-- Loading the kernel image into a VM's memory
+- VM-entry and VM-exit handlers
+- Creation of EPT mappings to virtualize guest physical memory
+    - Including support to copy data into a VM's address space
+- Parsing and validating `bzImage` kernel images
+- Support for directly booting and running `bzImage` kernels via the 32-bit Linux x86 boot protocol
