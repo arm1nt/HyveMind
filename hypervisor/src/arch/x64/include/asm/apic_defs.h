@@ -7,9 +7,40 @@
 #define APIC_MSR_BASE   0x800
 
 #define APIC_ID_REG             0x020
+#define APIC_VERSION_REG        0x030
+#define APIC_TPR_REG            0x080
+#define APIC_PPR_REG            0x0A0
 #define APIC_EOI_REG            0x0B0
+#define APIC_LDR_REG            0x0D0
 #define APIC_SVR_REG            0x0F0
+#define APIC_ISR_REG_W1         0x100
+#define APIC_ISR_REG_W2         0x110
+#define APIC_ISR_REG_W3         0x120
+#define APIC_ISR_REG_W4         0x130
+#define APIC_ISR_REG_W5         0x140
+#define APIC_ISR_REG_W6         0x150
+#define APIC_ISR_REG_W7         0x160
+#define APIC_ISR_REG_W8         0x170
+#define APIC_TMR_REG_W1         0x180
+#define APIC_TMR_REG_W2         0x190
+#define APIC_TMR_REG_W3         0x1A0
+#define APIC_TMR_REG_W4         0x1B0
+#define APIC_TMR_REG_W5         0x1C0
+#define APIC_TMR_REG_W6         0x1D0
+#define APIC_TMR_REG_W7         0x1E0
+#define APIC_TMR_REG_W8         0x1F0
+#define APIC_IRR_REG_W1         0x200
+#define APIC_IRR_REG_W2         0x210
+#define APIC_IRR_REG_W3         0x220
+#define APIC_IRR_REG_W4         0x230
+#define APIC_IRR_REG_W5         0x240
+#define APIC_IRR_REG_W6         0x250
+#define APIC_IRR_REG_W7         0x260
+#define APIC_IRR_REG_W8         0x270
+#define APIC_ERROR_STATUS_REG   0x280
 #define APIC_LVT_CMCI_REG       0x2F0
+#define APIC_ICR_REG_W1         0x300
+#define APIC_ICR_REG_W2         0x310
 #define APIC_LVT_TIMER_REG      0x320
 #define APIC_LVT_THERMAL_REG    0x330
 #define APIC_LVT_PERFMON_REG    0x340
@@ -97,6 +128,20 @@ enum apic_task_priority {
     TP_CLASS_14,
     TP_CLASS_15,
 };
+
+union ia32_apic_base_msr {
+    uint64_t raw;
+    struct {
+        uint64_t reserved0      : 8,
+                 bsp            : 1,
+                 reserved1      : 1,
+                 extd           : 1,
+                 global_enable  : 1,
+                 base           : 24,
+                 reserved2      : 28;
+    };
+};
+typedef union ia32_apic_base_msr apic_base_msr_t;
 
 #endif /* _HYVEMIND_X64_ASM_APIC_DEFS_H */
 

@@ -305,3 +305,9 @@ apic_signal_eoi(void)
     apic_write(APIC_EOI_REG, APIC_EOI_ACK);
 }
 
+uint32_t
+get_apic_version(void)
+{
+    return apic_read(APIC_VERSION_REG);
+}
+

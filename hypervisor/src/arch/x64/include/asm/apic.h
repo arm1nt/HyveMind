@@ -37,6 +37,7 @@ int setup_ap_apic(void);
 int apic_send_ipi(void);
 void apic_signal_eoi(void);
 phys_addr_t get_lapic_base(void);
+uint32_t get_apic_version(void);
 
 int apic_program_tsc_deadline_timer(const uint64_t tsc_deadline);
 
