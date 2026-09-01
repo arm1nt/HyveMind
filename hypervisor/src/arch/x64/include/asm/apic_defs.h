@@ -39,8 +39,6 @@
 #define APIC_IRR_REG_W8         0x270
 #define APIC_ERROR_STATUS_REG   0x280
 #define APIC_LVT_CMCI_REG       0x2F0
-#define APIC_ICR_REG_W1         0x300
-#define APIC_ICR_REG_W2         0x310
 #define APIC_LVT_TIMER_REG      0x320
 #define APIC_LVT_THERMAL_REG    0x330
 #define APIC_LVT_PERFMON_REG    0x340
@@ -50,6 +48,15 @@
 #define APIC_INITIAL_COUNT_REG  0x380
 #define APIC_CURR_COUNT_REG     0x390
 #define APIC_DIV_CONFIG_REG     0x3E0
+
+#define XAPIC_APR_REG           0x0A0
+#define XAPIC_RRD_REG           0x0C0
+#define XAPIC_DEST_FORMAT_REG   0x0E0
+#define XAPIC_ICR_REG_W1        0x300
+#define XAPIC_ICR_REG_W2        0x310
+
+#define X2APIC_ICR_REG          0x300
+#define X2APIC_SELF_IPI_REG     0x3F0
 
 /* Must be 0, any other value causes a GP */
 #define APIC_EOI_ACK    0x00
