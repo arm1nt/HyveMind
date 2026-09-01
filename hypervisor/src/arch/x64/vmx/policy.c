@@ -143,6 +143,8 @@ init_vmx_capabilities(void)
 {
     vmcs_pin_ctls min_pin_ctls;
     min_pin_ctls.raw = 0;
+    min_pin_ctls.external_interrupt_handling = 1;
+    min_pin_ctls.process_posted_interrupts = 1;
 
     vmx_caps.pin_ctls = set_reserved_pinbased_ctls_default1(min_pin_ctls);
     if ((vmx_caps.pin_ctls.raw & min_pin_ctls.raw) != min_pin_ctls.raw) {
@@ -154,6 +156,7 @@ init_vmx_capabilities(void)
     min_proc_ctls1.raw = 0;
     min_proc_ctls1.activate_secondary_controls = 1;
     min_proc_ctls1.msr_bitmaps = 1;
+    min_proc_ctls1.tpr_shadow = 1;
 
     vmx_caps.proc_ctls1 = set_reserved_procbased_ctls1_default1(min_proc_ctls1);
     if ((vmx_caps.proc_ctls1.raw & min_proc_ctls1.raw) != min_proc_ctls1.raw) {
@@ -169,6 +172,9 @@ init_vmx_capabilities(void)
         min_proc_ctls2.enable_invpcid = 1;
         min_proc_ctls2.enable_rdtscp = 1;
         min_proc_ctls2.virtualize_apic_accesses = 1;
+        min_proc_ctls2.virtualize_x2apic_mode = 1;
+        min_proc_ctls2.apic_register_virtualization = 1;
+        min_proc_ctls2.virtual_interrupt_delivery = 1;
 
         vmx_caps.proc_ctls2 = set_reserved_procbased_ctls2(min_proc_ctls2);
         if ((vmx_caps.proc_ctls2.raw & min_proc_ctls2.raw) != min_proc_ctls2.raw) {
