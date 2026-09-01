@@ -58,6 +58,9 @@
 #define X2APIC_ICR_REG          0x300
 #define X2APIC_SELF_IPI_REG     0x3F0
 
+/* In xAPIC mode the apic id starts at bit 24 in the apic id register */
+#define XAPIC_ID_SHIFT          24
+
 /* Must be 0, any other value causes a GP */
 #define APIC_EOI_ACK    0x00
 
