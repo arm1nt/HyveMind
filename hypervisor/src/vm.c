@@ -61,6 +61,10 @@ allocate_vm(const struct guest_config *config)
 
     memset(vm, 0, sizeof(*vm));
 
+    if (allocate_arch_vm(vm) != 0) {
+        return NULL;
+    }
+
     vm->nr_vcpus = config->nr_vcpus;
     vm->vcpus = (vcpu_t **) hmalloc(sizeof(vcpu_t *) * config->nr_vcpus);
     if (!vm->vcpus) {

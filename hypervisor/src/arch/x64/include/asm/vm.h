@@ -77,6 +77,7 @@ int allocate_arch_vcpu(struct vcpu *vcpu);
 void destroy_arch_vcpu(struct vcpu *vcpu);
 
 int arch_init_vm(struct vm *vm, const struct guest_config *config);
+int allocate_arch_vm(struct vm *vm);
 void destroy_arch_vm(struct vm *vm);
 
 #endif /* _HYVEMIND_X64_ASM_VM_H */

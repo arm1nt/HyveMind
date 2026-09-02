@@ -3,7 +3,6 @@
 #include "pf_alloc.h"
 #include "printf.h"
 #include "vm.h"
-#include "asm/apic.h"
 #include "vmx/ept.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
@@ -181,20 +180,6 @@ configure_linux_32bit_policy(struct vmx_virt_policy *policy)
     policy->entry_ctls.load_ia32_efer = 1;
 }
 
-static inline int
-add_permissive_msr_bitmap(struct vm *vm)
-{
-    virt_addr_t msr_bitmap;
-
-    if (get_page_zeroed(&msr_bitmap) != 0) {
-        pr_error("Failed to allocate msr bitmap");
-        return -1;
-    }
-
-    vm->arch_vm.vmx.msr_bitmap_addr = virt_to_phys(msr_bitmap);
-    return 0;
-}
-
 static int
 init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config)
 {
@@ -207,7 +192,7 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
 
     bsp = vm->vcpus[0];
     bsp->arch.is_bsp = true;
-    policy = bsp->arch.hw.vmx.virt_policy;
+    policy = vcpu_virt_policy(bsp);
 
     configure_linux_32bit_policy(policy);
     if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
@@ -224,11 +209,6 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
     /* Hide VMX enablement */
     cr4_shadow.vmxe = 0;
     vmx_set_cr4_mask_and_shadow(bsp, cr4_mask.raw, cr4_shadow.raw);
-
-    if (add_permissive_msr_bitmap(vm) != 0) {
-        pr_error("Failed to allocate permissive msr bitmap");
-        return -1;
-    }
 
     if (virtualize_guest_physical_memory(vm, config) != 0) {
         pr_error("Failed to create virtualized memory area for the VM");
@@ -284,6 +264,31 @@ arch_init_vm(struct vm *vm, const struct guest_config *config)
     die_reason("Unreachable");
 }
 
+int
+allocate_arch_vm(struct vm *vm)
+{
+    virt_addr_t msr_bitmap;
+    phys_addr_t apic_access_page;
+
+    if (get_page_zeroed(&msr_bitmap) != 0) {
+        pr_error("Failed to allocate the VM's MSR bitmap");
+        return ERR_NO_MEM;
+    }
+
+    vm->arch_vm.vmx.msr_bitmap_addr = virt_to_phys(msr_bitmap);
+
+    if (get_page_raw(&apic_access_page) != 0) {
+        pr_error("Failed to allocate the VM's APIC access page");
+        free_page(msr_bitmap);
+        vm->arch_vm.vmx.msr_bitmap_addr = 0;
+        return ERR_NO_MEM;
+    }
+
+    vm->arch_vm.vmx.apic_access_page = apic_access_page;
+
+    return 0;
+}
+
 void
 destroy_arch_vm(struct vm *vm)
 {
@@ -297,7 +302,7 @@ allocate_arch_vcpu(struct vcpu *vcpu)
     int ret;
 
     vcpu->arch.hw.vmx.virt_policy = hmalloc(sizeof(struct vmx_virt_policy));
-    if (!vcpu->arch.hw.vmx.virt_policy) {
+    if (!vcpu_virt_policy(vcpu)) {
         pr_error("Failed to allocate a vmx virt policy struct!");
         return -1;
     }
@@ -305,7 +310,7 @@ allocate_arch_vcpu(struct vcpu *vcpu)
     ret = vmx_vcpu_allocate(vcpu);
     if (ret != 0) {
         pr_debug("Failed to allocate the vmcs area for the vcpu");
-        hfree(vcpu->arch.hw.vmx.virt_policy);
+        hfree(vcpu_virt_policy(vcpu));
         return ret;
     }
 
@@ -323,8 +328,8 @@ destroy_arch_vcpu(struct vcpu *vcpu)
 
     vmx_destroy_vcpu(vcpu);
 
-    if (vcpu->arch.hw.vmx.virt_policy) {
-        hfree(vcpu->arch.hw.vmx.virt_policy);
+    if (vcpu_virt_policy(vcpu)) {
+        hfree(vcpu_virt_policy(vcpu));
     }
 }
 

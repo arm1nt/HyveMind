@@ -3,6 +3,8 @@
 
 #include "vmx/vmcs.h"
 
+#define vcpu_virt_policy(x) ((x)->arch.hw.vmx.virt_policy)
+
 struct vmx_virt_policy {
     vmcs_pin_ctls pin_ctls;
 
