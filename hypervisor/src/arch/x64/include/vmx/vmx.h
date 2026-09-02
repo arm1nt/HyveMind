@@ -42,6 +42,11 @@ int vmx_set_system_table(
         struct vcpu_sys_table table
 );
 
+void vmx_set_intercept_reg_rdmsr(const struct vm *vm, const uint64_t msr, const bool intercept);
+void vmx_set_intercept_reg_wrmsr(const struct vm *vm, const uint64_t msr, const bool intercept);
+
+int vmx_set_vlapic_mode(vcpu_t *vcpu, enum vlapic_mode mode);
+
 void vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code);
 
 int vmx_enter_vcpu(vcpu_t *vcpu);

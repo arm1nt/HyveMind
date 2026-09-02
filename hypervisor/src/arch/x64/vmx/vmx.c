@@ -614,6 +614,75 @@ error_out:
     return -1;
 }
 
+/**
+ * TODO: Eventually refactor to use generic bitmap handling logic instead of having
+ * to implement it here.
+ */
+static inline void
+__modify_msr_bitmap_bit(uint8_t *bitmap, const uint64_t sanitized_msr, const bool set)
+{
+    const unsigned int byte_pos = sanitized_msr / 8;
+    const unsigned int bit_pos = sanitized_msr % 8;
+
+    uint8_t *byte = &bitmap[byte_pos];
+
+    if (set) {
+        *byte |= U8_LSHIFT(1, bit_pos);
+    } else {
+        *byte &= ~(U8_LSHIFT(1, bit_pos));
+    }
+}
+
+void
+vmx_set_intercept_reg_rdmsr(const struct vm *vm, const uint64_t msr, const bool intercept)
+{
+    uint64_t sanitized_msr = msr;
+    uint8_t *bitmap_base = (uint8_t *) phys_to_virt(vm->arch_vm.vmx.msr_bitmap_addr);
+
+    if (__is_low_vmcs_msr(msr)) {
+        goto do_mod_bit;
+    } else if (__is_high_vmcs_msr(msr)) {
+        bitmap_base += VMCS_HIGH_READ_MSR_OFFSET;
+        sanitized_msr -= VMCS_MSR_HIGH_START;
+        goto do_mod_bit;
+    }
+
+    pr_error("Attempted to change read interceptability status of invalid msr: %lu", msr);
+    die();
+
+do_mod_bit:
+    __modify_msr_bitmap_bit(bitmap_base, sanitized_msr, intercept);
+}
+
+void
+vmx_set_intercept_reg_wrmsr(const struct vm *vm, const uint64_t msr, const bool intercept)
+{
+    uint64_t sanitized_msr = msr;
+    uint8_t *bitmap_base = (uint8_t *) phys_to_virt(vm->arch_vm.vmx.msr_bitmap_addr);
+
+    if (__is_low_vmcs_msr(msr)) {
+        bitmap_base += VMCS_LOW_WRITE_MSR_OFFSET;
+        goto do_mod_bit;
+    } else if (__is_high_vmcs_msr(msr)) {
+        bitmap_base += VMCS_HIGH_WRITE_MSR_OFFSET;
+        sanitized_msr -= VMCS_MSR_HIGH_START;
+        goto do_mod_bit;
+    }
+
+    pr_error("Attempted to change write interceptability status of invalid msr: %lu", msr);
+    die();
+
+do_mod_bit:
+    __modify_msr_bitmap_bit(bitmap_base, sanitized_msr, intercept);
+}
+
+int
+vmx_set_vlapic_mode(vcpu_t *vcpu, enum vlapic_mode mode)
+{
+    NOT_YET_IMPLEMENTED;
+    return 0;
+}
+
 /* Targeted vmcs area must be current */
 static inline void
 __vmx_update_ctrl_vectors(const struct vmx_virt_policy *policy)
@@ -653,7 +722,7 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
         return -1;
     }
 
-    policy = vcpu->arch.hw.vmx.virt_policy;
+    policy = vcpu_virt_policy(vcpu);
     __vmx_update_ctrl_vectors(policy);
 
     if (__vmx_initialize_host_state() != 0) {

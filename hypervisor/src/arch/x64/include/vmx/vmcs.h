@@ -254,7 +254,7 @@ __get_x_ctls_msr(const uint64_t true_msr, const uint64_t msr)
 union vmcs_pin_based_ctls_vector {
     uint32_t raw;
     struct {
-        uint32_t external_interrupt_handling    : 1,
+        uint32_t external_interrupt_exiting     : 1,
                  reserved0                      : 2,
                  nmi_exiting                    : 1,
                  reserved1                      : 1,
@@ -271,6 +271,22 @@ typedef union vmcs_pin_based_ctls_vector vmcs_pin_ctls;
 
 #define get_pinbased_ctls_msr() \
     __get_x_ctls_msr(MSR_IA32_VMX_TRUE_PINBASED_CTLS, MSR_IA32_VMX_PINBASED_CTLS)
+
+#define VMCS_MSR_LOW_START  0
+#define VMCS_MSR_LOW_END    0x00001FFF
+#define VMCS_MSR_HIGH_START 0xC0000000
+#define VMCS_MSR_HIGH_END   0xC0001FFF
+
+#define __is_low_vmcs_msr(x) \
+    (((x) >= VMCS_MSR_LOW_START) && ((x) <= VMCS_MSR_LOW_END))
+
+#define __is_high_vmcs_msr(x) \
+    (((x) >= VMCS_MSR_HIGH_START) && ((x) <= VMCS_MSR_HIGH_END))
+
+#define VMCS_LOW_READ_MSR_OFFSET    0
+#define VMCS_HIGH_READ_MSR_OFFSET   1024
+#define VMCS_LOW_WRITE_MSR_OFFSET   2048
+#define VMCS_HIGH_WRITE_MSR_OFFSET  3072
 
 union vmcs_primary_processor_based_ctls_vector {
     uint32_t raw;
@@ -514,8 +530,8 @@ enum vmcs_field_encoding: uint64_t {
     VM_EXIT_MSR_STORE_ADDRESS               = 0x00002006,
     VM_EXIT_MSR_LOAD_ADDRESS                = 0x00002008,
     VM_ENTRY_MSR_LOAD_ADDRESS               = 0x0000200a,
-    VIRTUAL_APIC_ADDRESS                    = 0x00002012,
-    APIC_ACCESS_ADDRESS                     = 0x00002014,
+    VIRTUAL_APIC_PAGE                       = 0x00002012,
+    APIC_ACCESS_PAGE                        = 0x00002014,
     VM_FUNCTION_CONTROLS                    = 0x00002018,
     EPT_POINTER                             = 0x0000201a,
     VMREAD_BITMAP_ADDRESS                   = 0x00002026,
@@ -548,6 +564,7 @@ enum vmcs_field_encoding: uint64_t {
     INJECTED_EVENT_IDENTIFICATION           = 0x00004016,
     INJECTED_EVENT_ERROR_CODE               = 0x00004018,
     VM_ENTRY_INSTRUCTION_LENGTH             = 0x0000401a,
+    TPR_TRESHOLD                            = 0x0000401c,
     SECONDARY_PROC_BASED_VM_EXEC_CONTROLS   = 0x0000401e,
     INSTRUCTION_TIMEOUT_CONTROL             = 0x00004024,
     VM_INSTRUCTION_ERROR                    = 0x00004400,

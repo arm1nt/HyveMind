@@ -18,6 +18,7 @@
 #define CPUID_CPU_VERSION_LEAF                  0x01
 #define CPUID_EXT_TOPOLOGY_LEAF                 0x0B
 #define CPUID_TSC_CRYSTAL_CLOCK_LEAF            0x15
+#define CPUID_V2_EXT_TOPOLOGY_LEAF              0x1F
 #define CPUID_PAGE_1GB_LEAF                     0x80000001
 #define CPUID_EXTENDED_FUNCTION_INFO1           0x80000007
 #define CPUID_MAX_PHYS_ADDR_LEAF                0x80000008
