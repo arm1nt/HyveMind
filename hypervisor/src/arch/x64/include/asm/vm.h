@@ -6,9 +6,10 @@
 #include "asm/arch_types.h"
 #include "asm/vcpu_guest_reg_state.h"
 #include "asm/x86_defs.h"
-#include "vmx/ept.h"
+#include "vmx/ept_types.h"
 #include "vmx/emulate.h"
 #include "vmx/vmcs.h"
+#include "vmx/vlapic.h"
 
 struct vm;
 struct vcpu;
@@ -35,12 +36,14 @@ enum vcpu_run_status {
 struct vmx_vcpu_state {
     enum vmcs_launch_state launch_state;
     phys_addr_t vmcs_ptr;
+    struct vlapic vlapic;
 
     /* todo: maybe move to vm struct instead of vcpu */
     struct vmx_virt_policy *virt_policy;
 };
 
 struct arch_vcpu {
+    bool is_bsp;
     /* Is vcpu active on any cpu or not. Relevant for e.g. migrating vcpu */
     bool active;
     /* Logical processor on which the vcpu is active/current */
@@ -65,6 +68,7 @@ struct arch_vm {
     struct {
         eptp_t eptp;
         phys_addr_t msr_bitmap_addr;
+        phys_addr_t apic_access_page;
         struct x86_emulate_ops ops;
     } vmx;
 };

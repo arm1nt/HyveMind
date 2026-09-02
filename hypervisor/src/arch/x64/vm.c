@@ -4,6 +4,7 @@
 #include "printf.h"
 #include "vm.h"
 #include "asm/apic.h"
+#include "vmx/ept.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
 #include "loader/loader.h"
@@ -158,7 +159,6 @@ init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
 
     /* remove later */
     vmx_enter_vcpu(bsp);
-
     die_reason("blocker");
 }
 
@@ -179,18 +179,6 @@ configure_linux_32bit_policy(struct vmx_virt_policy *policy)
     policy->exit_ctls1.save_ia32_efer = 1;
 
     policy->entry_ctls.load_ia32_efer = 1;
-}
-
-static inline int
-add_lapic_page_to_ept_mapping(struct vm *vm)
-{
-    const phys_addr_t lapic_base = get_lapic_base();
-    struct ept_mapping_info info =
-        create_ept_mapping_info(lapic_base, PAGE_SIZE, lapic_base);
-
-    info.no_page_flags = EPT_RWX;
-    info.page_map_flags = EPT_RWX | EPT_MAPS_PAGE | EPT_MEM_TYPE_UC_FLAG;
-    return add_ept_mapping(&vm->arch_vm.vmx.eptp, &info);
 }
 
 static inline int
@@ -218,11 +206,17 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
     cr4_t cr4_mask, cr4_shadow;
 
     bsp = vm->vcpus[0];
+    bsp->arch.is_bsp = true;
     policy = bsp->arch.hw.vmx.virt_policy;
 
     configure_linux_32bit_policy(policy);
     if ((ret = validate_vmx_virt_policy(policy)) != VMX_POLICY_VALID) {
         pr_error("Configured virt policy is invalid: %lu", U64(ret));
+        return -1;
+    }
+
+    if ((ret = init_vlapic(bsp, 0)) != VLAPIC_SUCCESS) {
+        pr_error("Failed to initialize the bsp's vlapic: %lu", ret);
         return -1;
     }
 
@@ -241,8 +235,8 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
         return -1;
     }
 
-    if (add_lapic_page_to_ept_mapping(vm) != 0) {
-        pr_error("Failed to add lapic page mapping to VMs EPT structures");
+    const gpaddr vlapic_mem_base = get_vlapic_mem_base(vcpu_vlapic(bsp));
+    if ((ret = remap_vlapic_base(vm, vlapic_mem_base)) != VLAPIC_SUCCESS) {
         return -1;
     }
 

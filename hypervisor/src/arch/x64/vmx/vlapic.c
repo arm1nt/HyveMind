@@ -16,7 +16,20 @@ guest_wrmsr_apic_base_msr(vcpu_t *vcpu, const uint64_t val)
 int
 remap_vlapic_base(struct vm *vm, const gpaddr vlapic_base)
 {
-    NOT_YET_IMPLEMENTED;
+    int ret;
+    const phys_addr_t apic_access_page = vm->arch_vm.vmx.apic_access_page;
+    struct ept_mapping_info info =
+        create_ept_mapping_info(vlapic_base, PAGE_SIZE, apic_access_page);
+
+    info.no_page_flags = EPT_RWX;
+    info.page_map_flags = EPT_RWX | EPT_MAPS_PAGE | EPT_MEM_TYPE_UC_FLAG;
+
+    if ((ret = add_ept_mapping(&vm->arch_vm.vmx.eptp, &info)) != 0) {
+        pr_error("Failed to map guest apic base to the VMs apic access page");
+        return VLAPIC_ACCESS_PAGE_MAPPING_ERROR;
+    }
+
+    return VLAPIC_SUCCESS;
 }
 
 static inline void

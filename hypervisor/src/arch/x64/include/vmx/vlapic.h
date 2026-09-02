@@ -7,6 +7,7 @@
 #define vcpu_vlapic(x) (&(x)->arch.hw.vmx.vlapic)
 
 struct vcpu;
+struct vm;
 
 enum vlapic_mode {
     VLAPIC_DISABLED,
@@ -25,12 +26,14 @@ struct vlapic {
 
 enum vlapic_op_status {
     VLAPIC_SUCCESS,
+    VLAPIC_ACCESS_PAGE_MAPPING_ERROR,
     VLAPIC_ERROR,
 };
 
 uint64_t get_vlapic_mem_base(const struct vlapic *vlapic);
 int guest_wrmsr_apic_base_msr(struct vcpu *vcpu, const uint64_t val);
 
+int remap_vlapic_base(struct vm *vm, const gpaddr vlapic_base);
 int init_vlapic(struct vcpu *vcpu, const uint32_t initial_apic_id);
 
 #endif /* _HYVEMIND_X64_VMX_VLAPIC_H */
