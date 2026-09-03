@@ -676,6 +676,13 @@ do_mod_bit:
     __modify_msr_bitmap_bit(bitmap_base, sanitized_msr, intercept);
 }
 
+void
+vmx_set_intercept_msr(const struct vm *vm, const uint64_t msr, const bool intercept)
+{
+    vmx_set_intercept_reg_rdmsr(vm, msr, intercept);
+    vmx_set_intercept_reg_wrmsr(vm, msr, intercept);
+}
+
 int
 vmx_set_vlapic_mode(vcpu_t *vcpu, enum vlapic_mode mode)
 {
