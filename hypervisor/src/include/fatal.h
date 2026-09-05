@@ -6,6 +6,10 @@
 
 #define __no_return __attribute__((noreturn))
 
+enum error_reason {
+    ERR_NO_MEM = 1,
+};
+
 #define die() __die(__FILE__, __LINE__)
 #define die_reason(msg) __die_reason(__FILE__, __LINE__, (msg))
 
