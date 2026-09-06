@@ -1,4 +1,5 @@
-#include <stdint.h>
+#include "halloc.h"
+#include "hyvstdlib.h"
 #include <stddef.h>
 #include "string.h"
 
@@ -92,5 +93,35 @@ strlen(const char *s)
     }
 
     return counter;
+}
+
+char *
+strdup_nt(const char *s)
+{
+    const size_t len = strlen(s) + 1;
+
+    char *copy = (char *) hmalloc(len * sizeof(char));
+    if (!copy) {
+        return NULL;
+    }
+
+    memcpy(copy, s, len);
+    return copy;
+}
+
+char *
+strndup_nt(const char *s, const size_t len)
+{
+    const size_t src_len = strlen(s);
+    const size_t dest_len = MIN(src_len, len);
+
+    char *copy = (char *) hmalloc((dest_len+1) * sizeof(char));
+    if (!copy) {
+        return NULL;
+    }
+
+    memcpy(copy, s, dest_len);
+    copy[dest_len] = '\0';
+    return copy;
 }
 

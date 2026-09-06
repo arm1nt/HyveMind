@@ -11,6 +11,9 @@ int memcmp(const void *s1, const void *s2, size_t len);
 int strcmp(const char *s1, const char *s2);
 /* Must be null terminated. */
 size_t strlen(const char *s);
+/* The resulting string copy is null terminated */
+char *strdup_nt(const char *s);
+char *strndup_nt(const char *s, const size_t len);
 
 #endif /* _HYVEMIND_STRING_H */
 
