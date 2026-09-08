@@ -20,7 +20,7 @@ struct radix_tree *create_radix_tree(void);
 bool radix_tree_add(struct radix_tree *tree, const char *key, const uintptr_t data);
 bool radix_tree_contains(const struct radix_tree *tree, const char *key);
 bool radix_tree_get(const struct radix_tree *tree, const char *key, uintptr_t *val);
-void destroy_radix_tree(struct radix_tree *tree);
+void destroy_radix_tree(const struct radix_tree *tree);
 
 #endif /* _HYVEMIND_LIB_RADIX_TREE_H */
 

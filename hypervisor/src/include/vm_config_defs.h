@@ -3,10 +3,10 @@
 
 #include "hyvstdlib.h"
 
-#define ADD_NODE(parent, child) parent "." TO_STR(child)
+#define CONFIG_SECTION_START    "[start]"
+#define CONFIG_SECTION_END      "[end]"
 
-/* undef to prevent the predefined value from messing up the config keys */
-#undef linux
+#define ADD_NODE(parent, child) parent "." TO_STR(child)
 
 #define VM_NODE             TO_STR(vm)
 #define VM_MEM_NODE         ADD_NODE(VM_NODE, mem)
