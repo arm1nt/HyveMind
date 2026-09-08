@@ -9,6 +9,7 @@ void *memmove(void *dst, const void *src, size_t len);
 int memcmp(const void *s1, const void *s2, size_t len);
 /* Both must be null terminated */
 int strcmp(const char *s1, const char *s2);
+int strncmp(const char *s1, const char *s2, const size_t len);
 /* Must be null terminated. */
 size_t strlen(const char *s);
 /* The resulting string copy is null terminated */

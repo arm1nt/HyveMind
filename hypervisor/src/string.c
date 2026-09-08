@@ -84,6 +84,22 @@ strcmp(const char *s1, const char *s2)
     }
 }
 
+int
+strncmp(const char *s1, const char *s2, const size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        if (s1[i] != s2[i]) {
+            return 1;
+        }
+
+        if (s1[i] == '\0') {
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 size_t
 strlen(const char *s)
 {
