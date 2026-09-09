@@ -3,8 +3,18 @@
 
 #include "hyvstdlib.h"
 
+#define HYVEMIND_CONFIG_FILE "hyvemind_config"
+
 #define CONFIG_SECTION_START    "[start]"
 #define CONFIG_SECTION_END      "[end]"
+#define CONFIG_SECTION_DELIM    "="
+
+const char *reserved_tokens[] = {
+    CONFIG_SECTION_START,
+    CONFIG_SECTION_END,
+    CONFIG_SECTION_DELIM,
+    NULL
+};
 
 #define ADD_NODE(parent, child) parent "." TO_STR(child)
 
@@ -39,6 +49,35 @@ const char *config_key_strings[] = {
     [CONFIG_VM_BOOT_LINUX_CMDLINE_KEY] = ADD_NODE(VM_LINUX_BOOT_NODE, cmdline),
 };
 
-#endif /* _HYVEMIND_VM_CONFIG_DEFS_H */
+static bool
+is_config_whitespace(const char c)
+{
+    return (c == ' ') || (c == '\r') || (c == '\t');
+}
 
+static bool
+is_config_delim(const char c)
+{
+    return c == CONFIG_SECTION_DELIM[0];
+}
+
+static bool
+is_valid_config_token_char(const char c)
+{
+    switch (c) {
+        case 'A' ... 'Z':
+        case 'a' ... 'z':
+        case '0' ... '9':
+        case '[':
+        case ']':
+        case '-':
+        case '_':
+        case '.':
+            return true;
+        default:
+            return false;
+    }
+}
+
+#endif /* _HYVEMIND_VM_CONFIG_DEFS_H */
 

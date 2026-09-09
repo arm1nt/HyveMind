@@ -22,7 +22,7 @@ destroy_radix_node(struct radix_node *node)
 }
 
 void
-destroy_radix_tree(struct radix_tree *tree)
+destroy_radix_tree(const struct radix_tree *tree)
 {
     if (!tree) {
         return;

@@ -17,9 +17,9 @@ struct mem_file {
     struct mem_file_ops ops;
 };
 
-#define file_at(f, pos) ((f)->f[(pos)])
-#define file_curr(f) ((f)->f[(f)->pos])
-#define file_oom(f) ((f)->pos >= (f)->size)
+#define file_at(_f, pos) ((_f)->f[(pos)])
+#define file_curr(_f) ((_f)->f[(_f)->pos])
+#define file_oom(_f) ((_f)->pos >= (_f)->size)
 
 enum seek_status {
     SEEK_OOM,
