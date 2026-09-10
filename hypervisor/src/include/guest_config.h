@@ -64,7 +64,7 @@ struct vm_config {
 
 struct vm_config_vector *get_vm_configs(const struct limine_module_response *mods);
 void destroy_vm_configs(const struct vm_config_vector *configs);
-uint64_t get_req_bytes(const struct vm_config *config);
+uint64_t get_vm_config_req_bytes(const struct vm_config *config);
 
 
 //---------------------------------------------------------------

@@ -38,18 +38,21 @@ struct vm_request {
 
 static struct radix_tree *supported_keys = NULL;
 
+static inline struct limine_file *
+__get_limine_file(const struct limine_module_response *mods, const char *file_name)
+{
+    for (uint64_t i = 0; i < mods->module_count; i++) {
+        if (strcmp(file_name, mods->modules[i]->string) == 0) {
+            return mods->modules[i];
+        }
+    }
+    return NULL;
+}
+
 static bool
 get_vm_config_file(const struct limine_module_response *mods, config_file_t *config)
 {
-    struct limine_file *raw_file = NULL;
-
-    for (uint64_t i = 0; i < mods->module_count; i++) {
-        if (strcmp(HYVEMIND_CONFIG_FILE, mods->modules[i]->string) == 0) {
-            raw_file = mods->modules[i];
-            break;
-        }
-    }
-
+    const struct limine_file *raw_file = __get_limine_file(mods, HYVEMIND_CONFIG_FILE);
     if (!raw_file) {
         return false;
     }
@@ -144,10 +147,8 @@ get_guest_type_from_string(const char *str)
         if (strcmp(type_str, str) == 0) {
             return index;
         }
-
         index++;
     }
-
     return -1;
 }
 
@@ -161,10 +162,8 @@ get_mem_granularity_from_string(const char *str)
         if (strcmp(gran_string, str) == 0) {
             return index;
         }
-
         index++;
     }
-
     return -1;
 }
 
@@ -249,8 +248,6 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
 
     return true;
 }
-
-#undef log_req_error
 
 static inline void
 get_token(struct parser_state *state, char *token)
@@ -447,6 +444,37 @@ parse_vm_config_file(config_file_t *file, struct vm_req_vector *req_vec)
     return PARSING_ERR_MALFORMED_FILE;
 }
 
+static void
+destroy_vm_request(const struct vm_request *request)
+{
+    if (request->name) {
+        hfree(request->name);
+    }
+    if (request->boot.linux.bzImage_name) {
+        hfree(request->boot.linux.bzImage_name);
+    }
+    if (request->boot.linux.initramfs_name) {
+        hfree(request->boot.linux.initramfs_name);
+    }
+    if (request->boot.linux.cmdline_str) {
+        hfree(request->boot.linux.cmdline_str);
+    }
+}
+
+static void
+destroy_vm_reqs(const struct vm_req_vector *requests)
+{
+    const int nr_reqs = size_vm_req_vector(requests);
+    struct vm_request request;
+
+    for (int i = 0; i < nr_reqs; i++) {
+        at_vm_req_vector(requests, &request, i);
+        destroy_vm_request(&request);
+    }
+
+    destroy_vm_req_vector(requests);
+}
+
 static struct vm_req_vector *
 get_vm_requests(const struct limine_module_response *mods)
 {
@@ -483,17 +511,78 @@ get_vm_requests(const struct limine_module_response *mods)
     return requests;
 
 req_parsing_err:
-    destroy_vm_req_vector(requests);
+    destroy_vm_reqs(requests);
 req_alloc_err:
     destroy_radix_tree(supported_keys);
     return NULL;
 }
 
 static bool
-vm_req_to_vm_config(const struct vm_request *req, struct vm_config *config)
-{
-    NOT_YET_IMPLEMENTED;
+get_linux_boot_info(
+        const struct limine_module_response *mods,
+        const struct vm_request *request,
+        struct vm_config *config
+) {
+    const struct limine_file *raw_bzimage =
+        __get_limine_file(mods, request->boot.linux.bzImage_name);
+
+    if (raw_bzimage == NULL) {
+        log_req_error("Cannot find specified bzImage file by the name '%s'",
+                request->boot.linux.bzImage_name
+        );
+        return false;
+    }
+
+    config->boot_info.linux.bzImage.addr = (uintptr_t) raw_bzimage->address;
+    config->boot_info.linux.bzImage.size = raw_bzimage->size;
+
+    const struct limine_file *raw_initramfs =
+        __get_limine_file(mods, request->boot.linux.initramfs_name);
+
+    if (raw_initramfs == NULL) {
+        log_req_error("Cannot find specified initramfs file by the name '%s'",
+                request->boot.linux.initramfs_name
+        );
+        return false;
+    }
+
+    config->boot_info.linux.initramfs.addr = (uintptr_t) raw_initramfs->address;
+    config->boot_info.linux.initramfs.size = raw_initramfs->size;
+
+    config->boot_info.linux.cmdline_str = strdup_nt(request->boot.linux.cmdline_str);
+    return true;
 }
+
+static bool
+vm_req_to_vm_config(
+        const struct limine_module_response *mods,
+        const struct vm_request *req,
+        struct vm_config *config
+) {
+    memset(config, 0, sizeof(struct vm_config));
+
+    config->name = strdup_nt(req->name);
+    config->type = req->type;
+    config->nr_vcpus = req->vcpus;
+    config->mem_size = req->mem_size;
+    config->granularity = req->granularity;
+
+    switch (config->type) {
+        case LINUX_DIRECT_BOOT_32BIT:
+            if (!get_linux_boot_info(mods, req, config)) {
+                return false;
+            }
+            break;
+        case MIRROR_VMM:
+            break;
+        case GUEST_UNSPECIFIED:
+            die_reason("Unreachable");
+    }
+
+    return true;
+}
+
+#undef log_req_error
 
 struct vm_config_vector *
 get_vm_configs(const struct limine_module_response *mods)
@@ -505,7 +594,7 @@ get_vm_configs(const struct limine_module_response *mods)
     const struct vm_req_vector *requests = get_vm_requests(mods);
     if (!requests) {
         pr_error("Error reading the VM configuration file");
-        die();
+        return NULL;
     }
 
     const int nr_reqs = size_vm_req_vector(requests);
@@ -522,27 +611,77 @@ get_vm_configs(const struct limine_module_response *mods)
     for (int i = 0; i < nr_reqs; i++) {
         at_vm_req_vector(requests, &request, i);
 
-        if (!vm_req_to_vm_config(&request, &config)) {
+        if (!vm_req_to_vm_config(mods, &request, &config)) {
+            /* Deallocate everything we might have already allocated for this entry */
+            push_back_vm_config_vector(vm_configs, config);
             goto req_to_conf_err;
         }
+
+        push_back_vm_config_vector(vm_configs, config);
     }
 
-    destroy_vm_req_vector(requests);
+    destroy_vm_reqs(requests);
     return vm_configs;
 
 req_to_conf_err:
-    destroy_vm_config_vector(vm_configs);
+    destroy_vm_configs(vm_configs);
 nr_reqs_err:
-    destroy_vm_req_vector(requests);
+    destroy_vm_reqs(requests);
     return NULL;
+}
+
+static inline void
+destroy_vm_config(const struct vm_config *config)
+{
+    if (config->name) {
+        hfree(config->name);
+    }
+
+    switch (config->type) {
+        case LINUX_DIRECT_BOOT_32BIT:
+            if (config->boot_info.linux.cmdline_str) {
+                hfree(config->boot_info.linux.cmdline_str);
+            }
+            break;
+        case MIRROR_VMM:
+            break;
+        case GUEST_UNSPECIFIED:
+            die_reason("Unreachable");
+    }
 }
 
 void
 destroy_vm_configs(const struct vm_config_vector *configs)
 {
-    NOT_YET_IMPLEMENTED;
+    const int nr_configs = size_vm_config_vector(configs);
+    struct vm_config config;
+
+    for (int i = 0; i < nr_configs; i++) {
+        at_vm_config_vector(configs, &config, i);
+        destroy_vm_config(&config);
+    }
+
+    destroy_vm_config_vector(configs);
 }
 
+#define MEM_GRANULARITY_KB_SHIFT 10
+#define MEM_GRANULARITY_MB_SHIFT 20
+#define MEM_GRANULARITY_GB_SHIFT 30
+
+uint64_t
+get_vm_config_req_bytes(const struct vm_config *config)
+{
+    switch (config->granularity) {
+        case BYTES:
+            return config->mem_size;
+        case KB:
+            return U64_LSHIFT(config->mem_size, MEM_GRANULARITY_KB_SHIFT);
+        case MB:
+            return U64_LSHIFT(config->mem_size, MEM_GRANULARITY_MB_SHIFT);
+        case GB:
+            return U64_LSHIFT(config->mem_size, MEM_GRANULARITY_GB_SHIFT);
+    }
+}
 
 //-----------------------
 //-----------------------
