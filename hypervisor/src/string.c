@@ -1,7 +1,7 @@
 #include "halloc.h"
 #include "hyvstdlib.h"
-#include <stddef.h>
 #include "string.h"
+#include "types.h"
 
 void *
 memset(void *dst, int c, size_t len)
@@ -139,5 +139,59 @@ strndup_nt(const char *s, const size_t len)
     memcpy(copy, s, dest_len);
     copy[dest_len] = '\0';
     return copy;
+}
+
+#define __is_digit(x) (((x) >= '0') && ((x) <= '9'))
+
+uint64_t
+strtoul(char *str, char **endptr, bool *overflow)
+{
+    char c;
+    int index = 0;
+    uint64_t res = 0;
+    *overflow = false;
+
+    while ((c = str[index]) != '\0') {
+        switch (c) {
+            case '-':
+                *endptr = &str[index];
+                return 0;
+            case '+':
+                if (!__is_digit(str[index+1])) {
+                    *endptr = str;
+                    return 0;
+                }
+
+                index++;
+                goto prefix_parsing_done;
+            case '0' ... '9':
+                goto prefix_parsing_done;
+            case ' ':
+                break;
+            default:
+                *endptr = str;
+                return 0;
+        }
+
+        index++;
+    }
+
+prefix_parsing_done:
+
+    while (str[index] != '\0' && __is_digit(str[index])) {
+        const int digit = str[index] - '0';
+
+        if (((U64_MAX - digit) / 10) < res) {
+            *overflow = true;
+            *endptr = &str[index];
+            return U64_MAX;
+        }
+
+        res = (res * 10) + digit;
+        index++;
+    }
+
+    *endptr = &str[index];
+    return res;
 }
 

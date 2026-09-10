@@ -12,6 +12,8 @@ typedef __uint128_t uint128_t;
 #define U64(val)    ((uint64_t) (val))
 #define U128(val)   ((uint128_t) (val))
 
+#define U64_MAX ~U64(0)
+
 #define CAST_TO(cast_base, val) ((typeof(cast_base))(val))
 
 #define U16_LOWER8(val)     ((val) & ((1 << 8) - 1))
