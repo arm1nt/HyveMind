@@ -87,19 +87,57 @@ error_out:
     return NULL;
 }
 
+#define log_req_error(fmt, ...) \
+    pr_error("(Config #%lu) " fmt, request->id __VA_OPT__(,) __VA_ARGS__)
+
 static bool
 valid_config_request(const struct vm_request *request)
 {
-    NOT_YET_IMPLEMENTED;
-}
+    if (request->name == NULL) {
+        log_req_error("The VM name is missing!");
+        return false;
+    }
 
-#define log_req_error(fmt, ...) \
-    pr_error("(Config #%lu) " fmt, request->id __VA_OPT__(,) __VA_ARGS__)
+    if (request->type == GUEST_UNSPECIFIED) {
+        log_req_error("No VM type is specified!");
+        return false;
+    }
+
+    if (request->vcpus == 0) {
+        log_req_error("The desired number of vCPUs is not set!");
+        return false;
+    }
+
+    if (request->mem_size == 0) {
+        log_req_error("The desired memory capacity is not configured!");
+        return false;
+    }
+
+    switch (request->type) {
+        case LINUX_DIRECT_BOOT_32BIT:
+            if (request->boot.linux.bzImage_name == NULL) {
+                log_req_error("No bzImage name specified");
+                return false;
+            }
+
+            if (request->boot.linux.initramfs_name == NULL) {
+                log_req_error("No initramfs name specified");
+                return false;
+            }
+            break;
+        case MIRROR_VMM:
+            break;
+        case GUEST_UNSPECIFIED:
+            die_reason("Unreachable");
+    }
+
+    return true;
+}
 
 static inline int
 get_guest_type_from_string(const char *str)
 {
-    int index = 0;
+    int index = GUEST_UNSPECIFIED + 1;
     const char *type_str;
 
     while ((type_str = vm_type_strings[index]) != NULL) {
@@ -153,14 +191,16 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
         case CONFIG_VM_VCPUS_KEY:
             request->vcpus = (unsigned int) strtoul(entry->value, &endptr, &overflow);
 
-            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-') {
+            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-' && !overflow) {
                 log_req_error("Expected the vcpu number value to only consist of "
-                        "one or more digits"
+                        "one or more digits. Instead, found: %s",
+                        entry->value
                 );
                 return false;
             } else if (*endptr == '-' || overflow || request->vcpus == 0) {
                 log_req_error("Expected the vcpu number value to be an integer "
-                        "greater than 1"
+                        "greater than 1. Instead, found: %s",
+                        entry->value
                 );
                 return false;
             }
@@ -169,14 +209,16 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
         case CONFIG_VM_MEM_SIZE_KEY:
             request->mem_size = (unsigned int) strtoul(entry->value, &endptr, &overflow);
 
-            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-') {
+            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-' && !overflow) {
                 log_req_error("Expected the mem size value to only consist of "
-                        "one or more digits"
+                        "one or more digits. Instead, found: %s",
+                        entry->value
                 );
                 return false;
             } else if (*endptr == '-' || overflow || request->vcpus == 0) {
                 log_req_error("Expected the mem size value to be an integer "
-                        "greater than 1"
+                        "greater than 1. Instead, found: %s",
+                        entry->value
                 );
                 return false;
             }

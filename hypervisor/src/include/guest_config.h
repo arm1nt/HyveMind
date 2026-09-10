@@ -25,6 +25,7 @@ static const char *mem_granularity_strings[] = {
 };
 
 enum guest_type {
+    GUEST_UNSPECIFIED,
     MIRROR_VMM,
     LINUX_DIRECT_BOOT_32BIT,
     /*GUEST_MIRROR_VMM,
