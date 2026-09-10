@@ -46,14 +46,14 @@ vm_memory_contig_range_fits(
 }
 
 static int
-virtualize_guest_physical_memory(struct vm *vm, const struct guest_config *config)
+virtualize_guest_physical_memory(struct vm *vm, const struct vm_config *config)
 {
     phys_addr_t contig_vm_mem_start;
     uint64_t req_bytes, req_pages;
     struct ept_mapping_info info;
     eptp_t eptp;
 
-    req_bytes = get_req_mem_size_bytes(config);
+    req_bytes = get_vm_config_req_bytes(config);
     req_pages = bytes_to_nr_pages(req_bytes);
 
     if (get_pages_raw(req_pages, &contig_vm_mem_start) != 0) {
@@ -116,7 +116,7 @@ set_guest_info(vcpu_t *vcpu, struct vcpu_guest_reg_state *state)
 }
 
 static int
-init_vm_mirroring_vmm(struct vm *vm, const struct guest_config *config)
+init_vm_mirroring_vmm(struct vm *vm, const struct vm_config *config)
 {
     int ret;
     vcpu_t *bsp;
@@ -176,12 +176,13 @@ configure_linux_32bit_policy(struct vmx_virt_policy *policy)
     policy->exit_ctls1.host_addr_space_size = 1;
     policy->exit_ctls1.load_ia32_efer = 1;
     policy->exit_ctls1.save_ia32_efer = 1;
+    policy->exit_ctls1.ack_interrupt_on_exit = 1;
 
     policy->entry_ctls.load_ia32_efer = 1;
 }
 
 static int
-init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config)
+init_vm_linux_direct_boot_32bit(struct vm *vm, const struct vm_config *config)
 {
     int ret;
     vcpu_t *bsp;
@@ -247,11 +248,11 @@ init_vm_linux_direct_boot_32bit(struct vm *vm, const struct guest_config *config
 }
 
 int
-arch_init_vm(struct vm *vm, const struct guest_config *config)
+arch_init_vm(struct vm *vm, const struct vm_config *config)
 {
     vm->arch_vm.vmx.ops = emulate_ops;
 
-    switch (config->guest_type) {
+    switch (config->type) {
         case LINUX_DIRECT_BOOT_32BIT:
             return init_vm_linux_direct_boot_32bit(vm, config);
         case MIRROR_VMM:

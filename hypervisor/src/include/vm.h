@@ -26,7 +26,7 @@ struct vm {
     struct arch_vm arch_vm;
 };
 
-struct vm * create_vm(const struct guest_config *config);
+struct vm * create_vm(const struct vm_config *config);
 void destroy_vm(struct vm *vm);
 
 uint64_t get_vm_memory_size(const struct vm *vm);

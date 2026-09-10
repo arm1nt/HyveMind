@@ -51,7 +51,7 @@ allocate_vcpu(struct vm *vm)
 }
 
 static inline struct vm *
-allocate_vm(const struct guest_config *config)
+allocate_vm(const struct vm_config *config)
 {
     struct vm *vm = (struct vm *) hmalloc(sizeof(struct vm));
     if (!vm) {
@@ -91,14 +91,14 @@ error_out_1:
 }
 
 static inline int
-init_vm(struct vm *vm, const struct guest_config *config)
+init_vm(struct vm *vm, const struct vm_config *config)
 {
     vm->name = config->name;
     return arch_init_vm(vm, config);
 }
 
 struct vm *
-create_vm(const struct guest_config *config)
+create_vm(const struct vm_config *config)
 {
     int ret;
 

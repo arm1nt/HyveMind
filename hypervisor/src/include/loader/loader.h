@@ -14,7 +14,7 @@ struct linux_load_info {
 
 int load_linux_32bit_direct_boot_for_vm(
         struct vm *vm,
-        const struct guest_config *config,
+        const struct vm_config *config,
         struct linux_load_info *load_info
 );
 

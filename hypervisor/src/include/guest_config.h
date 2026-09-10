@@ -66,38 +66,5 @@ struct vm_config_vector *get_vm_configs(const struct limine_module_response *mod
 void destroy_vm_configs(const struct vm_config_vector *configs);
 uint64_t get_vm_config_req_bytes(const struct vm_config *config);
 
-
-//---------------------------------------------------------------
-
-struct guest_config {
-    char *name;
-
-    enum guest_type guest_type;
-
-    unsigned int nr_vcpus;
-    uint64_t mem_size;
-    enum mem_granularity mem_granularity;
-
-    /* Names as specified in the limine config */
-    char *bzImage_name;
-    char *initramfs_name;
-
-    void *bzImage_addr;
-    uint64_t bzImage_size;
-    void *initramfs_addr;
-    uint64_t initramfs_size;
-
-    char *command_line;
-};
-typedef struct guest_config guest_cfg_t;
-
-struct guest_config_info {
-    unsigned int nr_guests;
-    guest_cfg_t *guest_configs;
-};
-
-struct guest_config_info get_guest_configs(const struct limine_module_response *mods);
-uint64_t get_req_mem_size_bytes(const struct guest_config *config);
-
 #endif /* _HYVEMIND_GUEST_CONFIG_H */
 

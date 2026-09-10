@@ -1,5 +1,6 @@
-#include "vm.h"
 #include "pf_alloc.h"
+#include "string.h"
+#include "vm.h"
 #include "loader/loader.h"
 #include "loader/linux.h"
 #include "asm/gdt_idt.h"
@@ -149,7 +150,7 @@ verify_bzImage(const struct setup_header *hdr)
 int
 load_linux_32bit_direct_boot_for_vm(
         struct vm *vm,
-        const struct guest_config *config,
+        const struct vm_config *config,
         struct linux_load_info *load_info
 ) {
     int ret;
@@ -164,16 +165,16 @@ load_linux_32bit_direct_boot_for_vm(
     gpaddr initramfs_gpaddr;
     struct setup_header *setup_header;
     struct boot_params *boot_params;
-    const char *command_line = "console=ttyS0 earlyprintk=serial nokaslr";
+    const char *command_line = config->boot_info.linux.cmdline_str;
 
-    if (config->bzImage_size < SETUP_HEADER_OFFSET + sizeof(struct setup_header)) {
+    if (config->boot_info.linux.bzImage.size < SETUP_HEADER_OFFSET + sizeof(struct setup_header)) {
         pr_error("Malformed bzImage provided. The image is too small to contain "
                 "even a complete setup header!"
         );
         return -1;
     }
 
-    bzImage_start = __vaddr(config->bzImage_addr);
+    bzImage_start = __vaddr(config->boot_info.linux.bzImage.addr);
     setup_header_addr = bzImage_start + SETUP_HEADER_OFFSET;
     setup_header = (struct setup_header *) setup_header_addr;
 
@@ -202,7 +203,7 @@ load_linux_32bit_direct_boot_for_vm(
     }
 
     pm_kernel_offset = (setup_sects + 1) * LINUX_BOOT_SECTOR_SIZE;
-    if (pm_kernel_offset >= config->bzImage_size) {
+    if (pm_kernel_offset >= config->boot_info.linux.bzImage.size) {
         pr_error("Malformed bzImage provided. The indicated start of the "
                 "protected mode kernel lies outside the kernel bzImage!"
         );
@@ -210,7 +211,7 @@ load_linux_32bit_direct_boot_for_vm(
     }
 
     pm_kernel_start = bzImage_start + pm_kernel_offset;
-    available_pm_kernel_size = config->bzImage_size - pm_kernel_offset;
+    available_pm_kernel_size = config->boot_info.linux.bzImage.size - pm_kernel_offset;
     declared_pm_kernel_size = U64(setup_header->syssize) << 4;
 
     if (!declared_pm_kernel_size) {
@@ -286,7 +287,7 @@ load_linux_32bit_direct_boot_for_vm(
     initramfs_gpaddr =  setup_header->pref_address + effective_pm_kernel_load_size + 1;
     initramfs_gpaddr = align_forward(initramfs_gpaddr, PAGE_SIZE);
 
-    ret = vm_memory_contig_range_fits(vm, initramfs_gpaddr, config->initramfs_size);
+    ret = vm_memory_contig_range_fits(vm, initramfs_gpaddr, config->boot_info.linux.initramfs.size);
     if (!ret) {
         pr_error("VM does not have sufficient memory to store the initramfs image");
         return -1;
@@ -295,8 +296,8 @@ load_linux_32bit_direct_boot_for_vm(
     ret = copy_to_vm_gpaddr(
             vm,
             initramfs_gpaddr,
-            (void *) config->initramfs_addr,
-            config->initramfs_size
+            (void *) config->boot_info.linux.initramfs.addr,
+            config->boot_info.linux.initramfs.size
     );
     if (ret != 0) {
         pr_error("Failed to copy the initramfs image into the VM memory");
@@ -344,7 +345,7 @@ load_linux_32bit_direct_boot_for_vm(
     boot_params->hdr.loadflags &= ~(SETUP_LOADFLAGS_CAN_USE_HEAP);
     boot_params->hdr.cmd_line_ptr = LINUX_GUEST_DEFAULT_COMMAND_LINE_GPADDR;
     boot_params->hdr.ramdisk_image = initramfs_gpaddr;
-    boot_params->hdr.ramdisk_size = config->initramfs_size;
+    boot_params->hdr.ramdisk_size = config->boot_info.linux.initramfs.size;
 
     /**
      * Atm we don't simulate any memory holes, but represent the kernel with

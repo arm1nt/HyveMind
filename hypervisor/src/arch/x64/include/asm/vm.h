@@ -37,8 +37,6 @@ struct vmx_vcpu_state {
     enum vmcs_launch_state launch_state;
     phys_addr_t vmcs_ptr;
     struct vlapic vlapic;
-
-    /* todo: maybe move to vm struct instead of vcpu */
     struct vmx_virt_policy *virt_policy;
 };
 
@@ -76,7 +74,7 @@ struct arch_vm {
 int allocate_arch_vcpu(struct vcpu *vcpu);
 void destroy_arch_vcpu(struct vcpu *vcpu);
 
-int arch_init_vm(struct vm *vm, const struct guest_config *config);
+int arch_init_vm(struct vm *vm, const struct vm_config *config);
 int allocate_arch_vm(struct vm *vm);
 void destroy_arch_vm(struct vm *vm);
 

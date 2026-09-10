@@ -88,13 +88,25 @@ hypervisor_main(void)
     arch_bringup_aps_limine(mp_request.response);
     /* wait_until_aps_online(); */
 
-    const struct guest_config_info guest_info = get_guest_configs(module_request.response);
+    const struct vm_config_vector *configs = get_vm_configs(module_request.response);
+    if (!configs) {
+        pr_error("Failed to create VM configs from the config file");
+        die();
+    }
+    pr_info("Done parsing VM config file!");
+    die();
 
-    for (unsigned int i = 0; i < guest_info.nr_guests; i++) {
-        struct vm *vm = create_vm(&guest_info.guest_configs[i]);
-        pr_info("Created VM: %s", vm->name);
+    const int nr_configs = size_vm_config_vector(configs);
+    struct vm_config config;
+
+    for (int i = 0; i < nr_configs; i++) {
+        at_vm_config_vector(configs, &config, i);
+        struct vm *vm = create_vm(&config);
+        pr_info("Created VM");
         destroy_vm(vm);
     }
+
+    destroy_vm_configs(configs);
 
     /* todo: submit created vcpus to scheduler */
 
