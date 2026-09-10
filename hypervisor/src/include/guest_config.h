@@ -16,11 +16,25 @@ enum mem_granularity {
     GB,
 };
 
+static const char *mem_granularity_strings[] = {
+    [BYTES] = "bytes",
+    [KB] = "kb",
+    [MB] = "mb",
+    [GB] = "gb",
+    NULL,
+};
+
 enum guest_type {
     MIRROR_VMM,
     LINUX_DIRECT_BOOT_32BIT,
     /*GUEST_MIRROR_VMM,
     GUEST_LINUX,*/
+};
+
+static const char *vm_type_strings[] = {
+    [MIRROR_VMM] = "MIRROR_VMM",
+    [LINUX_DIRECT_BOOT_32BIT] = "LINUX_DIRECT_BOOT_32BIT",
+    NULL,
 };
 
 struct file_info {

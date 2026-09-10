@@ -13,10 +13,12 @@
 #include "lib/vector_template.h"
 
 struct vm_request {
+    /* To associate error messages with config entries */
+    int id;
     char *name;
     enum guest_type type;
     unsigned int vcpus;
-    uint64_t mem_size;
+    unsigned int mem_size;
     enum mem_granularity granularity;
 
     struct {
@@ -91,12 +93,122 @@ valid_config_request(const struct vm_request *request)
     NOT_YET_IMPLEMENTED;
 }
 
-static int
-set_vm_request_val(struct vm_request *request, struct config_line *entry)
+#define log_req_error(fmt, ...) \
+    pr_error("(Config #%lu) " fmt, request->id __VA_OPT__(,) __VA_ARGS__)
+
+static inline int
+get_guest_type_from_string(const char *str)
 {
-    pr_info("key %s : %s", config_key_strings[entry->key], entry->value);
-    NOT_YET_IMPLEMENTED;
+    int index = 0;
+    const char *type_str;
+
+    while ((type_str = vm_type_strings[index]) != NULL) {
+        if (strcmp(type_str, str) == 0) {
+            return index;
+        }
+
+        index++;
+    }
+
+    return -1;
 }
+
+static inline int
+get_mem_granularity_from_string(const char *str)
+{
+    int index = 0;
+    const char *gran_string;
+
+    while ((gran_string = mem_granularity_strings[index]) != NULL) {
+        if (strcmp(gran_string, str) == 0) {
+            return index;
+        }
+
+        index++;
+    }
+
+    return -1;
+}
+
+static bool
+set_vm_request_val(struct vm_request *request, const struct config_line *entry)
+{
+    bool overflow;
+    char *endptr;
+    int guest_type, mem_gran;
+
+    switch (entry->key) {
+        case CONFIG_VM_NAME_KEY:
+            request->name = strdup_nt(entry->value);
+            break;
+        case CONFIG_VM_TYPE_KEY:
+            guest_type = get_guest_type_from_string(entry->value);
+            if (guest_type == -1) {
+                log_req_error("VM type '%s' is not supported", entry->value);
+                return false;
+            }
+
+            request->type = (enum guest_type) guest_type;
+            break;
+        case CONFIG_VM_VCPUS_KEY:
+            request->vcpus = (unsigned int) strtoul(entry->value, &endptr, &overflow);
+
+            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-') {
+                log_req_error("Expected the vcpu number value to only consist of "
+                        "one or more digits"
+                );
+                return false;
+            } else if (*endptr == '-' || overflow || request->vcpus == 0) {
+                log_req_error("Expected the vcpu number value to be an integer "
+                        "greater than 1"
+                );
+                return false;
+            }
+
+            break;
+        case CONFIG_VM_MEM_SIZE_KEY:
+            request->mem_size = (unsigned int) strtoul(entry->value, &endptr, &overflow);
+
+            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-') {
+                log_req_error("Expected the mem size value to only consist of "
+                        "one or more digits"
+                );
+                return false;
+            } else if (*endptr == '-' || overflow || request->vcpus == 0) {
+                log_req_error("Expected the mem size value to be an integer "
+                        "greater than 1"
+                );
+                return false;
+            }
+
+            break;
+        case CONFIG_VM_MEM_GRANULARITY_KEY:
+            mem_gran = get_mem_granularity_from_string(entry->value);
+            if (mem_gran == -1) {
+                log_req_error("Mem granularity value '%s' is not allowed", entry->value);
+                return false;
+            }
+
+            request->granularity = (enum mem_granularity) mem_gran;
+            break;
+        case CONFIG_VM_BOOT_LINUX_BZIMAGE_KEY:
+            request->boot.linux.bzImage_name = strdup_nt(entry->value);
+            break;
+        case CONFIG_VM_BOOT_LINUX_INITRAMFS_KEY:
+            request->boot.linux.initramfs_name = strdup_nt(entry->value);
+            break;
+        case CONFIG_VM_BOOT_LINUX_CMDLINE_KEY:
+            request->boot.linux.cmdline_str = strdup_nt(entry->value);
+            break;
+        case __CONFIG_OPTIONS_NR:
+        case __CONFIG_INVALID_KEY:
+            die_reason("Unreachable");
+    }
+
+    return true;
+}
+
+#undef log_req_error
 
 static inline void
 get_token(struct parser_state *state, char *token)
@@ -278,8 +390,10 @@ parse_vm_config_file(config_file_t *file, struct vm_req_vector *req_vec)
                 return PARSING_ERR_INVALID_ENTRY;
             }
 
+            const int prev_req_id = request.id;
             push_back_vm_req_vector(req_vec, *state.curr_request);
             memset(state.curr_request, 0, sizeof(struct vm_request));
+            request.id = prev_req_id + 1;
             parsing_state = PS_CONTINUE;
         }
     }

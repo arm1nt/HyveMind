@@ -9,9 +9,22 @@ seek_token_in_line(struct mem_file *f, uint64_t *start, uint64_t *end)
     uint64_t pos = f->pos;
     uint64_t start_pos = 0;
     bool inside_token = false;
+    bool in_quoted_token = false;
 
     while (!file_oom(f)) {
         const char c = file_at(f, pos);
+
+        if (in_quoted_token) {
+            if (c == '\"') {
+                f->pos = pos + 1;
+                *start = start_pos + 1;
+                *end = pos - 1;
+                return (*start < *end) ? SEEK_TOKEN : SEEK_INVALID_SYMBOL;
+            }
+
+            pos++;
+            continue;
+        }
 
         if (!inside_token) {
             if (c == LINE_BREAK) {
@@ -28,6 +41,11 @@ seek_token_in_line(struct mem_file *f, uint64_t *start, uint64_t *end)
                 return SEEK_TOKEN;
             } else if (f->ops.is_valid_token_char(c)) {
                 inside_token = true;
+                start_pos = pos;
+                pos++;
+                continue;
+            } else if (c == '\"') {
+                in_quoted_token = true;
                 start_pos = pos;
                 pos++;
                 continue;
