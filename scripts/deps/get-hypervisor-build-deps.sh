@@ -49,8 +49,6 @@ clone_repo_commit() {
 
 check_install_path
 
-rm -f "$INSTALL_PATH"/.deps-installed
-
 clone_repo_commit \
     https://github.com/osdev0/freestnd-c-hdrs-0bsd.git \
     "$INSTALL_PATH"/freestnd-c-hdrs \
@@ -65,6 +63,4 @@ clone_repo_commit \
     https://github.com/Limine-Bootloader/limine-protocol.git \
     "$INSTALL_PATH"/limine-protocol \
     80ef54bed402b8c0b672a707c1df4c532f3428ad
-
-touch "$INSTALL_PATH"/.deps-installed
 
