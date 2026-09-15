@@ -1,7 +1,7 @@
 #include "config_private.h"
 #include "fatal.h"
 #include "types.h"
-#include "guest_config.h"
+#include "vm_config.h"
 #include "printf.h"
 #include "string.h"
 #include "vm_config_defs.h"

@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_GUEST_CONFIG_H
-#define _HYVEMIND_GUEST_CONFIG_H
+#ifndef _HYVEMIND_VM_CONFIG_H
+#define _HYVEMIND_VM_CONFIG_H
 
 #include "hyvstdlib.h"
 #include "limine/limine.h"
@@ -66,5 +66,5 @@ struct vm_config_vector *get_vm_configs(const struct limine_module_response *mod
 void destroy_vm_configs(const struct vm_config_vector *configs);
 uint64_t get_vm_config_req_bytes(const struct vm_config *config);
 
-#endif /* _HYVEMIND_GUEST_CONFIG_H */
+#endif /* _HYVEMIND_VM_CONFIG_H */
 

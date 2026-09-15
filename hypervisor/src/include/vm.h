@@ -1,7 +1,7 @@
 #ifndef _HYVEMIND_VM_H
 #define _HYVEMIND_VM_H
 
-#include "guest_config.h"
+#include "vm_config.h"
 #include "asm/vm.h"
 
 struct vcpu {

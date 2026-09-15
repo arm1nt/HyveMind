@@ -1,7 +1,7 @@
 #ifndef _HYVEMIND_X64_ASM_VM_H
 #define _HYVEMIND_X64_ASM_VM_H
 
-#include "guest_config.h"
+#include "vm_config.h"
 #include "mm_types.h"
 #include "asm/arch_types.h"
 #include "asm/vcpu_guest_reg_state.h"
