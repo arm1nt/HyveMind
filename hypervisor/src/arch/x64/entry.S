@@ -87,6 +87,52 @@
         iretq
 .endm
 
-# Generate the interrupt and exception handler entry points
+.altmacro
+
+.macro asm_common_irq_trampoline_vec vec, cfunc
+    def_global_function asm_common_irq_trampoline_\vec
+
+    asm_common_irq_trampoline_\vec:
+        build_stack_frame
+        save_registers
+
+        callq \cfunc
+
+        restore_registers
+        leave
+        iretq
+.endm
+
+# Generate interrupt and exception handler entry points
+
 #include "asm/idt.h"
+
+# Generate the PIC interrupt handler trampolines
+.set irq_vec, IRQ_LEGACY_VECTOR(0)
+.rept IRQ_LEGACY_VECTOR_NR
+    .if irq_vec == 7 || irq_vec == 15
+        DEFINE_LEGACY_IRQ_TRAMPOLINE_SPURIOUS(irq_vec)
+    .else
+        DEFINE_LEGACY_IRQ_TRAMPOLINE(irq_vec)
+    .endif
+
+    .set irq_vec, irq_vec + 1
+.endr
+
+.section .rodata
+.balign 8
+
+.macro irq_trampoline_address vec
+    .quad COMMON_ASM_IRQ_TRAMPOLINE_NAME(\vec)
+.endm
+
+# Generate a table with trampoline addresses so we can refer to the created trampolines
+.global legacy_irq_asm_trampolines
+legacy_irq_asm_trampolines:
+    .set irq_vec, IRQ_LEGACY_VECTOR(0)
+
+    .rept IRQ_LEGACY_VECTOR_NR
+        irq_trampoline_address %(irq_vec)
+        .set irq_vec, irq_vec + 1
+    .endr
 

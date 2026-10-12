@@ -9,6 +9,12 @@
 #define IRQ_PAGE_FAULT_VECTOR       0x0e
 #define IRQ_VIRT_VECTOR             0x14
 
+#define IRQ_LEGACY_VECTOR_NR        16
+#define IRQ_LEGACY_BASE_VECTOR      0x20
+#define IRQ_LEGACY_VECTOR(x)        (IRQ_LEGACY_BASE_VECTOR + (x))
+#define IRQ_PIC1_BASE_VECTOR        IRQ_LEGACY_VECTOR(0)
+#define IRQ_PIC2_BASE_VECTOR        IRQ_LEGACY_VECTOR(8)
+
 #define IRQ_APIC_SPURIOUS_VECTOR    0xff
 #define IRQ_APIC_TIMER_VECTOR       0x30
 
