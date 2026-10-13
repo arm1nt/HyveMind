@@ -96,6 +96,7 @@
         build_stack_frame
         save_registers
 
+        movb $\vec, %dil
         callq \cfunc
 
         restore_registers
