@@ -30,6 +30,16 @@ typedef __uint128_t uint128_t;
 #define __CLEAR_BITS(val, mask) ((val) & ~(mask))
 #define CLEAR_BIT(val, bit_pos) __CLEAR_BITS(val, CAST_TO(val, 1) << (bit_pos))
 
+#define X_ONES_STREAM(nr) (U64_MAX >> (64 - (nr)))
+#define X_BITS_MASK(nr_bits, offset) (X_ONES_STREAM(nr_bits) << (offset))
+#define X_CLEAR_BITS_MASK(nr_bits, offset) (~X_BITS_MASK(nr_bits, offset))
+
+#define CLEAR_X_BITS(val, nr_bits, start_pos) \
+    ((val) & X_CLEAR_BITS_MASK(nr_bits, start_pos))
+
+#define SET_VAL_OFFSET(orig, val, nr_bits, offset) \
+    (CLEAR_X_BITS(orig, nr_bits, offset) | ((val) << (offset)))
+
 #define IS_SET(val, mask)       (val & mask)
 #define IS_CLEAR(val, mask)     ((val & mask) == 0)
 
