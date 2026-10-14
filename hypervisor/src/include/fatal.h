@@ -8,6 +8,9 @@
 
 enum error_reason {
     ERR_NO_MEM = 1,
+    ERR_INVAL,
+    ERR_BUSY,
+    ERR_IO,
 };
 
 #define die() __die(__FILE__, __LINE__)
