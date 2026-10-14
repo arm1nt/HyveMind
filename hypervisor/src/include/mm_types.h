@@ -6,6 +6,10 @@
 /* Marker for verbosity */
 #define __directly_mapped
 
+/* Markers to help indicate who owns some data */
+#define __owned
+#define __borrowed
+
 typedef uint64_t virt_addr_t;
 typedef uint64_t phys_addr_t;
 typedef uint64_t pfn_t;

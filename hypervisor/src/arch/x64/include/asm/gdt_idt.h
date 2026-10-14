@@ -65,6 +65,15 @@ static segment_descriptor_t hyvemind_cs_segment_desc =
 static segment_descriptor_t hyvemind_data_segment_desc =
     DEFINE_SEGMENT_DESCRIPTOR(CODE_DATA_SEGMENT_DESC, DATA_RW_EXPAND_DOWN, 0, 0);
 
+extern struct idt_struct idt;
+extern void register_idt_handler(struct idt_struct*, const int, const sys_seg_type_t, const virt_addr_t, const int);
+
+#define REGISTER_INTERRUPT_GATE(idt, index, handler, ist_index) \
+    register_idt_handler(idt, index, IA32E_INTERRUPT_GATE, (virt_addr_t)handler, ist_index)
+
+#define REGISTER_TRAP_GATE(idt, index, handler, ist_index)      \
+    register_idt_handler(idt, index, IA32E_TRAP_GATE, (virt_addr_t)handler, ist_index)
+
 int install_new_tss(void);
 virt_addr_t get_current_tss_base(void);
 void init_new_gdt(void);

@@ -10,7 +10,7 @@
 
 DEFINE_PER_CPU_ALIGNED(struct gdt_struct, gdt_tables, PAGE_SIZE);
 /* We share the idt across all logical processors */
-static struct idt_struct idt;
+struct idt_struct idt;
 
 void
 __div_exception_handler(void)
@@ -61,7 +61,7 @@ write_idt_entry(struct idt_struct *idt, const int index, const idt_gate_t gate)
     memcpy(((uint8_t *)idt) + (index * 16), &gate, sizeof(idt_gate_t));
 }
 
-static inline void
+void
 register_idt_handler(
         struct idt_struct *idt,
         const int index,
@@ -73,12 +73,6 @@ register_idt_handler(
     const idt_gate_t gate = create_idt_gate(handler, type, ist_index);
     write_idt_entry(idt, index, gate);
 }
-
-#define REGISTER_INTERRUPT_GATE(idt, index, handler, ist_index) \
-    register_idt_handler(idt, index, IA32E_INTERRUPT_GATE, (virt_addr_t)handler, ist_index)
-
-#define REGISTER_TRAP_GATE(idt, index, handler, ist_index)      \
-    register_idt_handler(idt, index, IA32E_TRAP_GATE, (virt_addr_t)handler, ist_index)
 
 static inline void
 _load_idt(const struct idt_struct *idt)

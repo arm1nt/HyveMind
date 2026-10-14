@@ -3,8 +3,6 @@
 
 #include "asm/irq_vectors.h"
 
-#define COMMON_ASM_IRQ_TRAMPOLINE_NAME(vec) asm_common_irq_trampoline_ ## vec
-
 #ifndef __ASSEMBLER__
 
 #include "asm/irq.h"
@@ -40,6 +38,8 @@ extern void common_legacy_irq_trampoline_spurious(const irq_t irq_vector);
     DEFINE_COMMON_IRQ_TRAMPOLINE_VEC(irq_vec, common_legacy_irq_trampoline_spurious)
 
 #endif /* __ASSEMBLER__ */
+
+#define COMMON_ASM_IRQ_TRAMPOLINE_NAME(vec) asm_common_irq_trampoline_ ## vec
 
 /**
  * In the assembly file, generate the asm trampoline.
