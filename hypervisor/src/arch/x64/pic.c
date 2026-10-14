@@ -1,4 +1,5 @@
 #include "hyvstdlib.h"
+#include "spinlock.h"
 #include "types.h"
 #include "io.h"
 #include "asm/irq.h"
@@ -28,6 +29,8 @@
 #define OCW3_READ_IRR           0x0002
 #define OCW3_READ_ISR           0x0003
 
+DEFINE_SPINLOCK(pic_lock);
+
 static inline uint8_t
 read_isr(const uint16_t target_port)
 {
@@ -38,30 +41,40 @@ read_isr(const uint16_t target_port)
 static void
 mask_irq(const hwirq_t device_irq)
 {
+    uint64_t flags;
+    spinlock_acquire_irq_save(&pic_lock, flags);
+
     const uint16_t target_port = (device_irq < 8) ? PIC1_DATA : PIC2_DATA;
     const uint8_t val = (device_irq < 8) ? device_irq : device_irq - 8;
 
     const uint8_t masked_imr = io_inb(target_port) | U8_LSHIFT(1, val);
     io_outb(target_port, masked_imr);
+    spinlock_release_irq_restore(&pic_lock, flags);
 }
 
 static void
 unmask_irq(const hwirq_t device_irq)
 {
+    uint64_t flags;
+    spinlock_acquire_irq_save(&pic_lock, flags);
+
     const uint16_t target_port = (device_irq < 8) ? PIC1_DATA : PIC2_DATA;
     const uint8_t val = (device_irq < 8) ? device_irq : device_irq - 8;
 
     const uint8_t unmasked_imr = io_inb(target_port) & ~U8_LSHIFT(1, val);
     io_outb(target_port, unmasked_imr);
+    spinlock_release_irq_restore(&pic_lock, flags);
 }
 
 static bool
 is_spurious(const irq_t irq_vec)
 {
+    spinlock_acquire(&pic_lock);
     const hwirq_t device_irq = irq_vec - IRQ_LEGACY_BASE_VECTOR;
     const uint16_t target_port = (device_irq < 8) ? PIC1_CMD : PIC2_CMD;
     const uint8_t val = (device_irq < 8) ? device_irq : device_irq - 8;
     const uint8_t isr = read_isr(target_port);
+    spinlock_release(&pic_lock);
 
     return IS_CLEAR(isr, U8_LSHIFT(1, val));
 }
@@ -69,19 +82,23 @@ is_spurious(const irq_t irq_vec)
 static void
 spurious_eoi(const irq_t irq_vec)
 {
+    spinlock_acquire(&pic_lock);
     if (irq_vec >= IRQ_LEGACY_VECTOR(8)) {
         io_outb(PIC1_CMD, PIC_EOI_CMD);
     }
+    spinlock_release(&pic_lock);
 }
 
 static void
 signal_eoi(const uint8_t hw_irq)
 {
+    spinlock_acquire(&pic_lock);
     if (hw_irq >= 8) {
         io_outb(PIC2_CMD, PIC_EOI_CMD);
     }
 
     io_outb(PIC1_CMD, PIC_EOI_CMD);
+    spinlock_release(&pic_lock);
 }
 
 static void
