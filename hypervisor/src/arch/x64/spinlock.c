@@ -37,9 +37,16 @@ atomic_release(volatile uint8_t *flag)
 void
 arch_spinlock_acquire(spinlock_t *lock)
 {
-    while (!atomic_acquire(&lock->flag)) {
-        asm volatile ("pause");
-    }
+    while (!atomic_acquire(&lock->flag))
+        cpu_relax();
+}
+
+uint64_t
+arch_spinlock_acquire_irq_save(spinlock_t *lock)
+{
+    uint64_t flags = disable_irq_save_status();
+    arch_spinlock_acquire(lock);
+    return flags;
 }
 
 void
