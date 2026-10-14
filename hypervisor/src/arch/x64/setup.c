@@ -4,6 +4,7 @@
 #include "string.h"
 #include "asm/apic.h"
 #include "asm/gdt_idt.h"
+#include "asm/irq.h"
 #include "asm/mm.h"
 #include "asm/pgtables.h"
 #include "asm/setup.h"
@@ -279,6 +280,9 @@ __arch_setup_bsp(void)
         die_reason("Failed to setup apic for BSP");
     }
 
+    logical_processor_t *bsp = get_current_logical_processor();
+    bsp->is_bsp = true;
+
     query_processor_max_leaf_values();
 
     if (early_mm_init() != 0) {
@@ -298,7 +302,11 @@ __arch_setup_bsp(void)
     load_gdt();
 
     init_shared_idt();
+    init_irqs();
     load_shared_idt();
+
+    enable_device_irqs();
+    enable_local_interrupts();
 
     if (!enable_vmx_feature_support()) {
         die_reason("Unable to enable VMX support for BSP");
@@ -307,6 +315,12 @@ __arch_setup_bsp(void)
     if (!enter_vmx_operation()) {
         die_reason("Error while trying to enter VMX operation on BSP");
     }
+}
+
+void
+finish_bsp_setup(void)
+{
+    NOT_YET_IMPLEMENTED;
 }
 
 extern uint8_t boot_info_scratch[];
@@ -318,6 +332,10 @@ struct shared_boot_info {
 static void __no_return
 arch_setup_ap(void)
 {
+    if (!check_cpu()) {
+        die_reason("Logical processor cannot support hyvemind operation");
+    }
+
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
 

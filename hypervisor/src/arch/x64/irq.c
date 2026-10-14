@@ -153,7 +153,7 @@ init_irqs(void)
 }
 
 void
-enable_irqs(void)
+enable_device_irqs(void)
 {
     bsp_apic_enable_legacy_irqs();
 }

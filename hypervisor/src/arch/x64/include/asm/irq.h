@@ -43,7 +43,7 @@ struct irq_desc {
 };
 
 void init_irqs(void);
-void enable_irqs(void);
+void enable_device_irqs(void);
 int request_irq(const enum irq_domain_type domain, const hwirq_t device_irq, struct irq_handler* handler);
 int remove_irq_handler(const enum irq_domain_type domain, const hwirq_t device_irq, const virt_addr_t handler_addr);
 
