@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_X64_ASM_APIC_NEW_H
-#define _HYVEMIND_X64_ASM_APIC_NEW_H
+#ifndef _HYVEMIND_X64_ASM_APIC_H
+#define _HYVEMIND_X64_ASM_APIC_H
 
 #include "mm_types.h"
 #include "asm/arch_types.h"
@@ -34,6 +34,11 @@ read_lapic_id(void)
 
 int setup_bsp_apic(void);
 int setup_ap_apic(void);
+
+/* Configure the BSP's LVT LINT0 entry for PIC support but keep it masked */
+void bsp_apic_enable_legacy_irq_support(void);
+void bsp_apic_enable_legacy_irqs(void);
+
 int apic_send_ipi(void);
 void apic_signal_eoi(void);
 phys_addr_t get_lapic_base(void);
@@ -41,5 +46,5 @@ uint32_t get_apic_version(void);
 
 int apic_program_tsc_deadline_timer(const uint64_t tsc_deadline);
 
-#endif /* _HYVEMIND_X64_ASM_APIC_NEW_H */
+#endif /* _HYVEMIND_X64_ASM_APIC_H */
 

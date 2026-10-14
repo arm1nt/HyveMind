@@ -28,7 +28,7 @@
 #define OCW3_READ_IRR           0x0002
 #define OCW3_READ_ISR           0x0003
 
-static uint8_t
+static inline uint8_t
 read_isr(const uint16_t target_port)
 {
     io_outb(target_port, OCW3_BASE | OCW3_READ_ISR);
@@ -100,7 +100,6 @@ init_pic(void)
     // Mask every IRQ until we explicitly want to use them
     io_outb(PIC1_DATA, 0xFF);
     io_outb(PIC2_DATA, 0xFF);
-
 }
 
 struct irq_domain legacy_pic_domain = {

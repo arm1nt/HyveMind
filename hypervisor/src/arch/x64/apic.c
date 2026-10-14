@@ -6,6 +6,7 @@
 #include "asm/apic_defs.h"
 #include "asm/irq_vectors.h"
 #include "asm/pgtables.h"
+#include "asm/vmm.h"
 
 DEFINE_PER_CPU(uint64_t, apic_hz);
 DEFINE_PER_CPU_VAL(bool, tsc_deadline_timer_configured, false);
@@ -39,7 +40,7 @@ __xapic_mem_write(const unsigned int reg, const uint32_t val)
     *ptr = val;
 }
 
-static inline void
+void
 apic_write(const unsigned int reg, const uint32_t val)
 {
     if (x2apic_mode_enabled()) {
@@ -59,9 +60,6 @@ apic_read(const unsigned int reg)
     }
 }
 
-#define __mask_lvt_entry(entry) SET_BIT(entry, APIC_LVT_MASK_BIT)
-#define __unmask_lvt_entry(entry) CLEAR_BIT(entry, APIC_LVT_MASK_BIT)
-
 static inline void
 mask_lvt_entry(const int reg)
 {
@@ -70,7 +68,13 @@ mask_lvt_entry(const int reg)
     apic_write(reg, lvt_entry);
 }
 
-#define __set_lvt_vector(entry, vector) (((entry) & ~0xFF) | (vector))
+static inline void
+unmask_lvt_entry(const int reg)
+{
+    uint32_t lvt_entry = apic_read(reg);
+    lvt_entry = __unmask_lvt_entry(lvt_entry);
+    apic_write(reg, lvt_entry);
+}
 
 static inline void
 set_lvt_vector(const int reg, const uint8_t vector)
@@ -111,7 +115,7 @@ apic_program_tsc_deadline_timer(const uint64_t tsc_deadline)
         set_percpu_val(tsc_deadline_timer_configured, true);
     }
 
-    write_msr(APIC_TSC_DEADLINE_MSR, tsc_deadline);
+    write_msr(MSR_APIC_TSC_DEADLINE, tsc_deadline);
     return APIC_SUCCESS;
 }
 
@@ -143,6 +147,28 @@ determine_apic_timer_frequency(void)
     apic_write(APIC_LVT_TIMER_REG, APIC_LVT_RESET_VAL);
 
     pr_info("apic timer runs at %lu HZ", percpu_val(apic_hz));
+}
+
+void
+bsp_apic_enable_legacy_irqs(void)
+{
+    if (!(get_current_logical_processor()->is_bsp))
+        return;
+
+    unmask_lvt_entry(APIC_LVT_LINT0_REG);
+}
+
+void
+bsp_apic_enable_legacy_irq_support(void)
+{
+    if (!(get_current_logical_processor()->is_bsp))
+        return;
+
+    uint64_t lvt_lint0 = apic_read(APIC_LVT_LINT0_REG);
+    lvt_lint0 = __set_lvt_dm(lvt_lint0, APIC_LVT_DM_EXTINT);
+    lvt_lint0 = __set_lvt_tm(lvt_lint0, APIC_LVT_TM_LEVEL);
+    lvt_lint0 = __mask_lvt_entry(lvt_lint0);
+    apic_write(APIC_LVT_LINT0_REG, lvt_lint0);
 }
 
 static inline void

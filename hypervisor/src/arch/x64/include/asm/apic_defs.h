@@ -2,8 +2,9 @@
 #define _HYVEMIND_X64_ASM_APIC_DEFS_H
 
 #include "types.h"
+#include "asm/cpufeatures.h"
 
-#define APIC_MEM_BASE   U64_LSHIFT(0xFEE00000, 12)
+#define APIC_MEM_BASE   0xFEE00000
 #define APIC_MSR_BASE   0x800
 
 #define APIC_ID_REG             0x020
@@ -68,7 +69,30 @@
 #define APIC_LVT_MASK_BIT       16
 #define APIC_LVT_TIMER_MODE_POS 17
 
-#define APIC_TSC_DEADLINE_MSR   0x6E0
+#define __set_lvt_vector(entry, vector) (((entry) & ~0xFF) | (vector))
+#define __mask_lvt_entry(entry) SET_BIT(entry, APIC_LVT_MASK_BIT)
+#define __unmask_lvt_entry(entry) CLEAR_BIT(entry, APIC_LVT_MASK_BIT)
+
+#define APIC_LVT_DM_FIXED   0
+#define APIC_LVT_DM_SMI     2
+#define APIC_LVT_DM_NMI     4
+#define APIC_LVT_DM_INIT    5
+#define APIC_LVT_DM_EXTINT  7
+
+#define APIC_LVT_DM_OFFSET  8
+#define APIC_LVT_DM_WIDTH   3
+
+#define __set_lvt_dm(entry, dm_type) \
+    SET_VAL_OFFSET(entry, dm_type, APIC_LVT_DM_WIDTH, APIC_LVT_DM_OFFSET)
+
+#define APIC_LVT_TM_EDGE    0
+#define APIC_LVT_TM_LEVEL   1
+
+#define APIC_LVT_TM_OFFSET  15
+#define APIC_LVT_TM_WIDTH   1
+
+#define __set_lvt_tm(entry, tm_type) \
+    SET_VAL_OFFSET(entry, tm_type, APIC_LVT_TM_WIDTH, APIC_LVT_TM_OFFSET)
 
 enum apic_timer_type {
     APIC_ONESHOT_TIMER,
@@ -147,8 +171,7 @@ union ia32_apic_base_msr {
                  reserved1      : 1,
                  extd           : 1,
                  global_enable  : 1,
-                 base           : 24,
-                 reserved2      : 28;
+                 base           : 52;
     };
 };
 typedef union ia32_apic_base_msr apic_base_msr_t;

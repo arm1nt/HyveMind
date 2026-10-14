@@ -107,7 +107,7 @@ enum general_msr {
 #define MSR_APIC_BASE_EN_BIT                11
 #define MSR_APIC_BASE_EN                    (U64_LSHIFT(1, MSR_APIC_BASE_EN_BIT))
 
-#define MSR_X2APIC_LAPIC_ID_REGISTER        0x802
+#define MSR_APIC_TSC_DEADLINE   0x6E0
 
 #define MSRX64_FTR_CTRL_LOCK_BIT            0
 #define MSRX64_FTR_CTRL_LOCKED              (U64_LSHIFT(1, MSRX64_FTR_CTRL_LOCK_BIT))
