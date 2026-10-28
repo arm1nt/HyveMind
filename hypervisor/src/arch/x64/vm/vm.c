@@ -2,6 +2,8 @@
 #include "halloc.h"
 #include "pf_alloc.h"
 #include "vm.h"
+#include "asm/arch_types.h"
+#include "asm/apic_defs.h"
 #include "loader/loader.h"
 #include "vmx/ept.h"
 #include "vmx/policy.h"
@@ -154,17 +156,45 @@ prepare_vm_env_devices(struct vm *vm, const struct vm_config *config)
 static int
 prepare_apic_virtualization(struct vm *vm, const struct vm_config *config)
 {
-    NOT_YET_IMPLEMENTED;
+    lapicid_t lapic_id_counter = 0;
+    phys_addr_t apic_access_page;
+
+    if (get_page_raw(&apic_access_page) != 0)
+        return -ERR_NO_MEM;
+
+    vm_apic_access_page(vm) = apic_access_page;
+
+    if (remap_vlapic_base(vm, APIC_MEM_BASE) != VLAPIC_SUCCESS) {
+        pr_error("Error mapping apic-access-page to addr 0x%lx in VM %s's addr space",
+                APIC_MEM_BASE,
+                vm->name
+        );
+        free_page_raw(apic_access_page);
+        return -1;
+    }
+
+    configure_vlapic_msr_intercepts(vm);
+
+    for (int i = 0; i < vm->nr_vcpus; i++) {
+        int ret = init_vlapic(vm->vcpus[i], lapic_id_counter, lapic_id_counter == 0);
+        if (ret != 0) {
+            pr_error("Failed to initialize vlapic for vCPU (%lu) of VM %s", i, vm->name);
+            NOT_YET_IMPLEMENTED;
+        }
+        lapic_id_counter++;
+    }
+
+    return 0;
 }
 
 static int
-prepare_remaining_vm_environment(struct vm *vm, const struct vm_config *config)
+prepare_general_vm_environment(struct vm *vm, const struct vm_config *config)
 {
     virt_addr_t msr_bitmap;
 
     if (get_page_zeroed(&msr_bitmap) != 0) {
         pr_error("Failed to allocate MSR bitmap for VM %s", vm->name);
-        return -1;
+        return -ERR_NO_MEM;
     }
 
     vm_msr_bitmap_addr(vm) = virt_to_phys(msr_bitmap);
@@ -256,11 +286,14 @@ configure_base_virt_policy(struct vmx_virt_policy *policy)
     policy->proc_ctls1.activate_secondary_controls = 1;
     policy->proc_ctls1.msr_bitmaps = 1;
     policy->proc_ctls1.io_bitmaps = 1;
+    policy->proc_ctls1.tpr_shadow = 1;
 
     policy->proc_ctls2.enable_invpcid = 1;
     policy->proc_ctls2.enable_ept = 1;
     policy->proc_ctls2.unrestricted_guest = 1;
     policy->proc_ctls2.enable_rdtscp = 1;
+    policy->proc_ctls2.virtualize_apic_accesses = 1;
+    policy->proc_ctls2.apic_register_virtualization = 1;
 
     policy->exit_ctls1.host_addr_space_size = 1;
     policy->exit_ctls1.load_ia32_efer = 1;
@@ -273,8 +306,12 @@ configure_base_virt_policy(struct vmx_virt_policy *policy)
 int
 arch_prepare_execution_env(struct vm *vm, const struct vm_config *config)
 {
+    if (prepare_general_vm_environment(vm, config) != 0)
+        return -1;
+
     if (virtualize_guest_physical_mem(vm, config) != 0) {
         pr_error("Failed to virtualize memory for VM %s", vm->name);
+        free_page_raw(vm_msr_bitmap_addr(vm));
         return -1;
     }
 
@@ -288,10 +325,6 @@ arch_prepare_execution_env(struct vm *vm, const struct vm_config *config)
         pr_error("Failed to prepare APIC virtualization for VM %s", vm->name);
         destroy_virtualized_guest_mem(vm);
         /* Todo: free everything that was allocated for the vm_env_devices */
-        NOT_YET_IMPLEMENTED;
-    }
-
-    if (prepare_remaining_vm_environment(vm, config) != 0) {
         NOT_YET_IMPLEMENTED;
     }
 
