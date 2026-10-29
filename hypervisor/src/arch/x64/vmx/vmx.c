@@ -12,6 +12,7 @@
 #include "asm/vmm.h"
 #include "vmx/emulate.h"
 #include "vmx/policy.h"
+#include "vmx/io.h"
 #include "vmx/vmx.h"
 #include "vmx/vmcs.h"
 #include "vmx/vmx_ops.h"
@@ -19,62 +20,98 @@
 DEFINE_PER_CPU(vcpu_t *, curr_vcpu);
 #define current_vcpu (percpu_val(curr_vcpu))
 
-static int
-ensure_vcpu_current(vcpu_t *vcpu)
+void
+__vmx_clear_vcpu(vcpu_t *vcpu)
 {
-    if (vcpu == current_vcpu) {
-        return 0;
-    }
-
-    if (vcpu->arch.active && !(vcpu->arch.active_processor == get_current_cpuid())) {
-        pr_warn("Cannot make vcpu current as its already current on another processor!"
-                "Current processor (%lu) vs. processor the vcpu is current on (%lu)",
-                U64(get_current_cpuid()),
-                U64(vcpu->arch.active_processor)
+    if (vcpu_vmx(vcpu).active_cpu != get_current_cpuid()) {
+        pr_warn("Cannot clear vCPU that is active on cpu %lu on cpu %lu",
+                vcpu_vmx(vcpu).active_cpu,
+                get_current_cpuid()
         );
-
-        return -1;
+        return;
     }
 
-    const int res = vmptrld(vcpu->arch.hw.vmx.vmcs_ptr);
+    vmclear(vcpu_vmx(vcpu).vmcs_ptr);
+
+    vcpu_vmx(vcpu).active_cpu = INVALID_CPUID;
+    vcpu_vmx(vcpu).launch_state = VMCS_LS_CLEAR;
+
+    if (vcpu == current_vcpu) {
+        set_percpu_val(curr_vcpu, 0);
+    }
+}
+
+void
+vmx_clear_vcpu(vcpu_t *vcpu)
+{
+    if (vcpu_vmx(vcpu).active_cpu == INVALID_CPUID)
+        return;
+
+    if (vcpu_vmx(vcpu).active_cpu == get_current_cpuid()) {
+        __vmx_clear_vcpu(vcpu);
+        return;
+    }
+
+    /**
+     * Todo:
+     *  Send IPI to the processor on which the vCPU is active and have it
+     *  call __vmx_clear_vcpu on the vCPU.
+     */
+    NOT_YET_IMPLEMENTED;
+}
+
+static int
+vmx_load_vcpu(vcpu_t *vcpu)
+{
+    const int res = vmptrld(vcpu_vmx(vcpu).vmcs_ptr);
     if (res != VMX_OP_SUCCESS) {
-        pr_warn("'vmptrld' in ensure_vcpu_current() has failed: %lu", res);
+        pr_warn("Failed to load vCPU");
         return res;
     }
 
-    vcpu->arch.active = true;
-    vcpu->arch.active_processor = get_current_cpuid();
+    vcpu_vmx(vcpu).active_cpu = get_current_cpuid();
+    return 0;
+}
+
+static int
+vmx_make_vcpu_current(vcpu_t *vcpu)
+{
+    if (vcpu == current_vcpu)
+        return 0;
+
+    if (vcpu_vmx(vcpu).active_cpu == INVALID_CPUID)
+        vcpu_vmx(vcpu).active_cpu = get_current_cpuid();
+
+    if (vcpu_vmx(vcpu).active_cpu != get_current_cpuid()) {
+        pr_debug("Making vCPU active on cpu %lu current on cpu %lu",
+                vcpu_vmx(vcpu).active_cpu,
+                get_current_cpuid()
+        );
+
+        vmx_clear_vcpu(vcpu);
+    }
+
+    const int res = vmx_load_vcpu(vcpu);
+    if (res != 0) {
+        vcpu_vmx(vcpu).active_cpu = INVALID_CPUID;
+        return res;
+    }
 
     set_percpu_val(curr_vcpu, vcpu);
     return 0;
 }
 
-static inline int
-clear_vcpu(vcpu_t *vcpu)
+/**
+ * Before calling, it must be ensured that the vCPU is not currently running on
+ * any cpu.
+ */
+void
+vmx_destroy_vcpu(vcpu_t *vcpu)
 {
-    if (vcpu->arch.active && !(vcpu->arch.active_processor == get_current_cpuid())) {
-        pr_warn("Cannot clear a VMCS that is active on another processor! "
-                "Current processor (%lu) vs. processor the VMCS is active on (%lu)",
-                U64(get_current_cpuid()),
-                U64(vcpu->arch.active_processor)
-        );
-        return -1;
-    }
+    vmx_clear_vcpu(vcpu);
 
-    if (!vcpu->arch.active) {
-        pr_debug("Clearing an already non-active vcpu");
-    }
-
-    vmclear(vcpu->arch.hw.vmx.vmcs_ptr);
-
-    if (vcpu == current_vcpu) {
-        current_vcpu = NULL;
-    }
-
-    vcpu->arch.active = false;
-    vcpu->arch.active_processor = INVALID_PROCESSOR_ID;
-    vcpu->arch.hw.vmx.launch_state = VMCS_LS_CLEAR;
-    return 0;
+    free_page_raw(vcpu_vmx(vcpu).vmcs_ptr);
+    vcpu_vmx(vcpu).vmcs_ptr = 0;
 }
 
 int
@@ -86,50 +123,21 @@ vmx_vcpu_allocate(vcpu_t *vcpu)
     vmcs_ptr = create_new_vmcs_area();
     if (!vmcs_ptr) {
         pr_error("Failed to allocate a VMCS area");
-        return -1;
+        return -ERR_NO_MEM;
     }
 
     res = vmclear(vmcs_ptr);
     if (res != VMX_OP_SUCCESS) {
-        pr_error("'vmclear' on new vmcs area failed: %lu", U64(res));
+        pr_error("'vmclear' on new VMCS area failed: %lu", U64(res));
         free_page_raw(vmcs_ptr);
         return -1;
     }
 
-    vcpu->arch.active = false;
-    vcpu->arch.active_processor = INVALID_PROCESSOR_ID;
-    vcpu->arch.run_status = VCPU_NOT_READY;
-    vcpu->arch.hw.vmx.vmcs_ptr = vmcs_ptr;
-    vcpu->arch.hw.vmx.launch_state = VMCS_LS_CLEAR;
+    vcpu_vmx(vcpu).vmcs_ptr = vmcs_ptr;
+    vcpu_vmx(vcpu).launch_state = VMCS_LS_CLEAR;
+    vcpu_vmx(vcpu).active_cpu = INVALID_CPUID;
 
     return 0;
-}
-
-void
-vmx_destroy_vcpu(vcpu_t *vcpu)
-{
-    phys_addr_t *curr_vmcs_ptr = &vcpu->arch.hw.vmx.vmcs_ptr;
-
-    if (!vcpu->arch.active) {
-        goto do_destroy;
-    }
-
-    if (vcpu->arch.active_processor == get_current_cpuid()) {
-        clear_vcpu(vcpu);
-        goto do_destroy;
-    } else {
-        pr_info("Need to execute 'clear_vcpu' on the target procesor (%lu)!",
-                U64(vcpu->arch.active_processor)
-        );
-        NOT_YET_IMPLEMENTED;
-    }
-
-do_destroy:
-
-    if (*curr_vmcs_ptr) {
-        free_page_raw(*curr_vmcs_ptr);
-        *curr_vmcs_ptr = 0;
-    }
 }
 
 #define VMX_CR0_FIXED0 (read_msr(MSRX64_IA32_VMX_CR0_FIXED0))
@@ -251,33 +259,6 @@ leave_vmx_operation(void)
     current->vmx_operation_active = false;
 
     pr_info("Successfully left VMX operation");
-}
-
-void
-vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code)
-{
-    ensure_vcpu_current(vcpu);
-
-    vmcs_event_inject_t event_id;
-    event_id.raw = 0;
-
-    event_id.type = INJECT_EVENT_TYPE_HW_EXCEPTION;
-    event_id.valid = 1;
-    event_id.vector = vector;
-
-    switch (vector) {
-        case IRQ_UD_VECTOR:
-            /* No error code */
-            break;
-        case IRQ_GP_VECTOR:
-        default:
-            event_id.error_code = 1;
-            vmwrite(INJECTED_EVENT_ERROR_CODE, error_code);
-            break;
-    }
-
-    vmwrite(INJECTED_EVENT_IDENTIFICATION, event_id.raw);
-    clear_vcpu(vcpu);
 }
 
 static inline void
@@ -405,34 +386,30 @@ vmx_set_guest_cr0(vcpu_t *vcpu, const cr0_t cr0)
         }
     }
 
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
     vmwrite(GUEST_CR0, cr0.raw);
-    clear_vcpu(vcpu);
     return 0;
 }
 
 void
 vmx_set_guest_cr3(vcpu_t *vcpu, const cr3_t cr3)
 {
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
     vmwrite(GUEST_CR3, cr3.cr3_64b.raw);
-    clear_vcpu(vcpu);
 }
 
 void
 vmx_set_guest_cr4(vcpu_t *vcpu, const cr4_t cr4)
 {
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
     vmwrite(GUEST_CR4, cr4.raw);
-    clear_vcpu(vcpu);
 }
 
 void
 vmx_set_guest_efer(vcpu_t *vcpu, const ia32_efer_t efer)
 {
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
     vmwrite(GUEST_IA32_EFER, efer.raw);
-    clear_vcpu(vcpu);
 }
 
 void
@@ -452,10 +429,9 @@ vmx_get_default_cr4_mask_and_shadow(uint64_t *default_mask, uint64_t *default_sh
 void
 vmx_set_cr4_mask_and_shadow(vcpu_t *vcpu, const uint64_t mask, const uint64_t shadow)
 {
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
     vmwrite(CR4_GUEST_HOST_MASK, mask);
     vmwrite(CR4_READ_SHADOW, shadow);
-    clear_vcpu(vcpu);
 }
 
 int
@@ -465,8 +441,7 @@ vmx_set_system_table(
         struct vcpu_sys_table table
 ) {
     table.limit &= 0xFFF;
-
-    ensure_vcpu_current(vcpu);
+    vmx_make_vcpu_current(vcpu);
 
     switch (type) {
         case X86_GDT:
@@ -479,12 +454,10 @@ vmx_set_system_table(
             goto success_out;
         default:
             pr_error("Unknown sys table type");
-            clear_vcpu(vcpu);
             return -1;
     }
 
 success_out:
-    clear_vcpu(vcpu);
     return 0;
 }
 
@@ -503,9 +476,8 @@ vmx_set_cs_register(vcpu_t *vcpu, const struct vcpu_segment segment)
 static int
 __vmx_set_ldtr_segment_register(const struct vcpu_segment segment)
 {
-    if (segment.access_rights.segment_unusable) {
+    if (segment.access_rights.segment_unusable)
         goto out;
-    }
 
     if (segment.selector.ti) {
         pr_error("LDT descriptor must be in the GDT (i.e. TI flag 0). "
@@ -551,7 +523,6 @@ __vmx_set_ldtr_segment_register(const struct vcpu_segment segment)
         pr_error("LDTR: 'g' flag is not 1");
         return -1;
     }
-
 out:
     WRITE_GUEST_SEGMENT_REG(LDTR, segment);
     return 0;
@@ -563,18 +534,15 @@ vmx_set_segment_register(
         const enum x86_segment_reg reg,
         const struct vcpu_segment segment
 ) {
-    ensure_vcpu_current(vcpu);
-
+    vmx_make_vcpu_current(vcpu);
     /* TODO: add remaining validation */
 
     switch (reg) {
         case X86_CS_REG:
-
             if (segment.base >> 32) {
                 pr_error("Upper 32 bits of the cs base must be 0");
-                return -1;
+                goto error_out;
             }
-
             WRITE_GUEST_SEGMENT_REG(CS, segment);
             break;
         case X86_SS_REG:
@@ -602,21 +570,18 @@ vmx_set_segment_register(
             break;
         default:
             pr_error("Unknown segment type specified");
-            clear_vcpu(vcpu);
             return -1;
     }
 
-    clear_vcpu(vcpu);
     return 0;
-
 error_out:
-    clear_vcpu(vcpu);
     return -1;
 }
 
 /**
- * TODO: Eventually refactor to use generic bitmap handling logic instead of having
- * to implement it here.
+ * Todo:
+ *  Refactor to use generic bitmap handling logic instead of (re-)implementing
+ *  it here.
  */
 static inline void
 __modify_msr_bitmap_bit(uint8_t *bitmap, const uint64_t sanitized_msr, const bool set)
@@ -683,14 +648,6 @@ vmx_set_intercept_msr(const struct vm *vm, const uint64_t msr, const bool interc
     vmx_set_intercept_reg_wrmsr(vm, msr, intercept);
 }
 
-int
-vmx_set_vlapic_mode(vcpu_t *vcpu, enum vlapic_mode mode)
-{
-    NOT_YET_IMPLEMENTED;
-    return 0;
-}
-
-/* Targeted vmcs area must be current */
 static inline void
 __vmx_update_ctrl_vectors(const struct vmx_virt_policy *policy)
 {
@@ -723,8 +680,9 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
 {
     int ret;
     struct vmx_virt_policy *policy;
+    cr4_t cr4_mask, cr4_shadow;
 
-    if ((ret = ensure_vcpu_current(vcpu)) != VMX_OP_SUCCESS) {
+    if ((ret = vmx_make_vcpu_current(vcpu)) != VMX_OP_SUCCESS) {
         pr_error("Error making vcpu current to initialize VMCS: %lu", U64(ret));
         return -1;
     }
@@ -760,9 +718,28 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
         }
     }
 
+    if (vmx_policy_is_option_configured(policy, VMX_POLICY_IO_BITMAP)) {
+        const phys_addr_t bitmap_a = vcpu->vm->arch_vm.vmx.io_bitmap_addr;
+        const phys_addr_t bitmap_b = bitmap_a + VMCS_HIGH_IO_OFFSET;
+        vmwrite(ADDRESS_IO_BITMAP_A,bitmap_a);
+        vmwrite(ADDRESS_IO_BITMAP_B, bitmap_b);
+    }
+
     if (vmx_policy_is_option_configured(policy, VMX_POLICY_EPT)) {
         vmwrite(EPT_POINTER, vcpu->vm->arch_vm.vmx.eptp.raw);
     }
+
+    if (vmx_policy_is_option_configured(policy, __VMX_POLICY_VIRTUALIZE_APIC)) {
+        vmwrite(APIC_ACCESS_PAGE, vm_apic_access_page(vcpu->vm));
+        vmwrite(VIRTUAL_APIC_PAGE, vcpu_vlapic(vcpu)->virtual_apic_page);
+        vmwrite(TPR_TRESHOLD, 0);
+    }
+
+    vmx_get_default_cr4_mask_and_shadow(&cr4_mask.raw, &cr4_shadow.raw);
+    /* Hide that vmx is enabled */
+    cr4_shadow.vmxe = 0;
+    vmwrite(CR4_GUEST_HOST_MASK, cr4_mask.raw);
+    vmwrite(CR4_READ_SHADOW, cr4_shadow.raw);
 
     vmwrite(GUEST_IA32_SYSENTER_CS, 0);
     vmwrite(GUEST_IA32_SYSENTER_ESP, 0);
@@ -770,12 +747,32 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
     vmwrite(GUEST_IA32_DEBUGCTL, 0);
     vmwrite(GUEST_DR7, 0);
 
-    clear_vcpu(vcpu);
     return 0;
-
 error_out:
-    clear_vcpu(vcpu);
     return ret;
+}
+
+void
+vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code)
+{
+    vmcs_event_inject_t event_id;
+    event_id.raw = 0;
+    event_id.type = INJECT_EVENT_TYPE_HW_EXCEPTION;
+    event_id.valid = 1;
+    event_id.vector = vector;
+
+    switch (vector) {
+        case IRQ_UD_VECTOR:
+            /* No error code */
+            break;
+        case IRQ_GP_VECTOR:
+        default:
+            event_id.error_code = 1;
+            vmwrite(INJECTED_EVENT_ERROR_CODE, error_code);
+            break;
+    }
+
+    vmwrite(INJECTED_EVENT_IDENTIFICATION, event_id.raw);
 }
 
 /* in vmx/entry.S */
@@ -799,9 +796,9 @@ int
 vmx_enter_vcpu(vcpu_t *vcpu)
 {
     int ret;
-    enum vmcs_launch_state launch_state = vcpu->arch.hw.vmx.launch_state;
+    enum vmcs_launch_state launch_state = vcpu_vmx(vcpu).launch_state;
 
-    if ((ret = ensure_vcpu_current(vcpu)) != 0) {
+    if ((ret = vmx_make_vcpu_current(vcpu)) != 0) {
         pr_error("vCPU entry failed due to error making the vcpu current: %s",
                 stringify_vmx_op_status(ret)
         );
@@ -822,7 +819,7 @@ vmx_enter_vcpu(vcpu_t *vcpu)
 void
 vmx_vm_exit_handler(struct vcpu_user_regs *regs)
 {
-    uint64_t exit_reason_raw;
+    uint64_t exit_reason_raw, exit_qualification_raw;
     vmcs_exit_reason_t exit_reason;
     vcpu_t *vcpu = current_vcpu;
     const struct x86_emulate_ops *emu_ops = &vcpu->vm->arch_vm.vmx.ops;
@@ -835,9 +832,10 @@ vmx_vm_exit_handler(struct vcpu_user_regs *regs)
 
     vmread(EXIT_REASON, &exit_reason_raw);
     exit_reason.raw = exit_reason_raw;
+    vmread(EXIT_QUALIFICATION, &exit_qualification_raw);
 
     if (exit_reason.vm_entry_failure) {
-        pr_error("vm entry failed");
+        pr_error("VM-entry failed");
         dump_vmcs();
         die();
     }
@@ -846,12 +844,36 @@ vmx_vm_exit_handler(struct vcpu_user_regs *regs)
         case EXIT_REASON_CPUID:
             emu_ops->emulate_cpuid(vcpu, regs);
             break;
+        case EXIT_REASON_IO_INSTRUCTION:
+            guest_io_instruction(vcpu, regs, exit_qualification_raw);
+            step_guest_rip(regs);
+            break;
         case EXIT_REASON_RDMSR_IMPLICIT:
         case EXIT_REASON_RDMSR_IMMEDIATE:
             emu_ops->emulate_rdmsr(vcpu, regs);
             break;
+        case EXIT_REASON_WRMSR_IMPLICIT_WRMSRNS:
+        case EXIT_REASON_WRMSRNS_IMMEDIATE:
+        case EXIT_REASON_WRMSRLIST:
+            emu_ops->emulate_wrmsr(vcpu, regs);
+            break;
         case EXIT_REASON_XSETBV:
             emu_ops->emulate_xsetbv(vcpu, regs);
+            break;
+        case EXIT_REASON_EXCEPTION:
+            dump_vmcs();
+            die();
+            NOT_YET_IMPLEMENTED;
+        case EXIT_REASON_TRP_BELOW_THRESHOLD:
+            dump_vmcs();
+            die();
+            NOT_YET_IMPLEMENTED;
+        case EXIT_REASON_APIC_ACCESS:
+            pr_error("APIC ACCESS ERROR REASON");
+            dump_vmcs();
+            die();
+        case EXIT_REASON_APIC_WRITE:
+            guest_apic_register_write(vcpu, exit_qualification_raw);
             break;
         default:
             dump_vmcs();

@@ -214,6 +214,28 @@ union vmcs_cr_access_exit_qualification {
     };
 };
 
+#define IO_QUAL_WRITE   0
+#define IO_QUAL_READ    1
+
+#define IO_QUAL_SIZE_BYTE   0
+#define IO_QUAL_SIZE_WORD   1
+#define IO_QUAL_SIZE_DWORD  3
+
+union vmcs_io_exit_qualification {
+    uint64_t raw;
+    struct {
+        uint64_t access_size : 3,
+                 direction: 1,
+                 string: 1,
+                 rep: 1,
+                 op_immedidate: 1,
+                 undefined0: 9,
+                 port: 16,
+                 undefined1: 32;
+    };
+};
+typedef union vmcs_io_exit_qualification vmcs_io_exit_qualification_t;
+
 union vmcs_exit_qualification {
     vmcs_ept_exit_qual_t ept_violation_exqual;
 };
@@ -272,6 +294,9 @@ typedef union vmcs_pin_based_ctls_vector vmcs_pin_ctls;
 #define get_pinbased_ctls_msr() \
     __get_x_ctls_msr(MSR_IA32_VMX_TRUE_PINBASED_CTLS, MSR_IA32_VMX_PINBASED_CTLS)
 
+#define VMCS_MSR_BITMAP_PAGES   1
+#define VMCS_IO_BITMAP_PAGES    2
+
 #define VMCS_MSR_LOW_START  0
 #define VMCS_MSR_LOW_END    0x00001FFF
 #define VMCS_MSR_HIGH_START 0xC0000000
@@ -287,6 +312,20 @@ typedef union vmcs_pin_based_ctls_vector vmcs_pin_ctls;
 #define VMCS_HIGH_READ_MSR_OFFSET   1024
 #define VMCS_LOW_WRITE_MSR_OFFSET   2048
 #define VMCS_HIGH_WRITE_MSR_OFFSET  3072
+
+#define VMCS_IO_LOW_START   0
+#define VMCS_IO_LOW_END     0x7FFF
+#define VMCS_IO_HIGH_START  0x8000
+#define VMCS_IO_HIGH_END    0xFFFF
+
+#define __is_low_vmcs_io_port(x) \
+    (((x) >= VMCS_IO_LOW_START) && ((x) <= VMCS_IO_LOW_END))
+
+#define __is_high_vmcs_io_port(x) \
+    (((x) >= VMCS_IO_HIGH_START) && ((x) <= VMCS_IO_HIGH_END))
+
+#define VMCS_LOW_IO_OFFSET  0
+#define VMCS_HIGH_IO_OFFSET 4096
 
 union vmcs_primary_processor_based_ctls_vector {
     uint32_t raw;

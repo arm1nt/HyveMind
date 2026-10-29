@@ -1,3 +1,4 @@
+#include "stddef.h"
 #include "asm/vm.h"
 #include "asm/vcpu_guest_reg_state.h"
 
@@ -33,10 +34,10 @@ __dummy_vcpu_user_regs_offsets(void)
 void
 __dummy_arch_vcpu_members_offset(void)
 {
-    OFFSET(AVCPU_ACTIVE, struct arch_vcpu, active);
-    OFFSET(AVCPU_ACTIVE_CPU, struct arch_vcpu, active_processor);
     OFFSET(AVCPU_USR_STATE, struct arch_vcpu, state);
 
     OFFSET(AVCPU_HW, struct arch_vcpu, hw);
     OFFSET(AVCPU_HW_VMX_LAUNCH_STATE, struct vmx_vcpu_state, launch_state);
+    OFFSET(AVCPU_HW_VMX_ACTIVE_CPU, struct vmx_vcpu_state, active_cpu);
 }
+
