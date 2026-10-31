@@ -40,6 +40,18 @@ __xapic_mem_write(const unsigned int reg, const uint32_t val)
     *ptr = val;
 }
 
+static inline void
+apic_write_icr(const uint64_t val)
+{
+    if (x2apic_mode_enabled()) {
+        const uint64_t msr = APIC_MSR_BASE + (X2APIC_ICR_REG >> 4);
+        write_msr(msr, val);
+    } else {
+        __xapic_mem_write(XAPIC_ICR_REG_W2, U64_UPPER32(val));
+        __xapic_mem_write(XAPIC_ICR_REG_W1, U64_LOWER32(val));
+    }
+}
+
 void
 apic_write(const unsigned int reg, const uint32_t val)
 {
@@ -89,6 +101,31 @@ set_divide_config_register(const enum apic_frequency_divisor freq_div)
 {
     const uint32_t val = (freq_div >= 4) ? freq_div+4 : freq_div;
     apic_write(APIC_DIV_CONFIG_REG, val);
+}
+
+void
+apic_send_targeted_ipi(const cpuid_t target, const uint8_t vector)
+{
+    apic_icr_t icr;
+    lapicid_t target_lapic;
+
+    target_lapic = cpuid_to_lapic_id(target);
+    if (target_lapic == INVALID_LAPIC_ID)
+        return;
+
+    icr.raw = 0;
+    icr.vector = vector;
+    icr.delivery_mode = APIC_ICR_DM_FIXED;
+    icr.destination_mode = APIC_ICR_DEST_MODE_PHYSICAL;
+    icr.level = 1;
+
+    if (x2apic_mode_enabled()) {
+        icr.destination = target_lapic;
+    } else {
+        icr.destination = target_lapic << 24;
+    }
+
+    apic_write_icr(icr.raw);
 }
 
 static inline void

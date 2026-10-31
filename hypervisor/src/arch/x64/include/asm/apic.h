@@ -39,7 +39,7 @@ int setup_ap_apic(void);
 void bsp_apic_enable_legacy_irq_support(void);
 void bsp_apic_enable_legacy_irqs(void);
 
-int apic_send_ipi(void);
+void apic_send_targeted_ipi(const cpuid_t target, const uint8_t vector);
 void apic_signal_eoi(void);
 phys_addr_t get_lapic_base(void);
 uint32_t get_apic_version(void);

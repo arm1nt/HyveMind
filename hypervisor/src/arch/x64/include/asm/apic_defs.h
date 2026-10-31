@@ -126,6 +126,11 @@ union apic_svr {
 };
 typedef union apic_svr apic_svr_t;
 
+#define APIC_ICR_DM_FIXED 0x00
+
+#define APIC_ICR_DEST_MODE_PHYSICAL 0x00
+#define APIC_ICR_DEST_MODE_LOGICAL  0x01
+
 union apic_icr {
     uint64_t raw;
     struct {
