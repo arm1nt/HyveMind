@@ -277,6 +277,92 @@ out:
     return ret;
 }
 
+static inline void
+__vpic_ack(struct __vpic *vpic, const uint8_t irq)
+{
+    const uint8_t mask = U8_LSHIFT(1, irq);
+    vpic->irr &= ~mask;
+    vpic->isr |= mask;
+}
+
+static inline int
+vpic_get_priority(const uint8_t val)
+{
+    if (val == 0)
+        return 8;
+
+    uint8_t prio = 0;
+    while (!(val & U8_LSHIFT(1, prio)) && prio < 8)
+        prio++;
+
+    return (prio == 8) ? 8 : prio;
+}
+
+static inline int
+__vpic_get_pending_irq(struct __vpic *vpic)
+{
+    const int pending_irq_prio = vpic_get_priority(vpic->irr & ~vpic->imr);
+    if (pending_irq_prio == 8)
+        return -1;
+
+    const int curr_prio = vpic_get_priority(vpic->isr);
+    if (pending_irq_prio < curr_prio) {
+        return pending_irq_prio;
+    } else {
+        return -1;
+    }
+}
+
+bool
+vpic_has_pending_irq(struct vpic *vpic)
+{
+    spinlock_acquire(&vpic->lock);
+
+    bool ret = false;
+    const int irq1 = __vpic_get_pending_irq(&vpic->vpic1);
+    const int irq2 = __vpic_get_pending_irq(&vpic->vpic2);
+    const int vpic1_prio = vpic_get_priority(vpic->vpic1.isr);
+
+    if (irq2 != -1) {
+        if ((irq1 == -1 || irq1 > 2) && vpic1_prio > 2) {
+            ret = true;
+        }
+    } else if (irq1 != -1) {
+        ret = true;
+    }
+
+    spinlock_release(&vpic->lock);
+    return ret;
+}
+
+/**
+ * Returns the pending IRQ number (or -1) and acknowledges the interrupt
+ */
+int
+vpic_get_pending_irq(struct vpic *vpic)
+{
+    spinlock_acquire(&vpic->lock);
+
+    int intno = -1;
+    const int irq1 = __vpic_get_pending_irq(&vpic->vpic1);
+    const int irq2 = __vpic_get_pending_irq(&vpic->vpic2);
+    const int vpic1_prio = vpic_get_priority(vpic->vpic1.isr);
+
+    if (irq2 != -1) {
+        if ((irq1 == -1 || irq1 > 2) && vpic1_prio > 2) {
+            intno = irq2 + vpic->vpic2.offset;
+            __vpic_ack(&vpic->vpic1, 2);
+            __vpic_ack(&vpic->vpic2, irq2);
+        }
+    } else if (irq1 != -1) {
+        intno = irq1 + vpic->vpic1.offset;
+        __vpic_ack(&vpic->vpic1, irq1);
+    }
+
+    spinlock_release(&vpic->lock);
+    return intno;
+}
+
 static inline char *
 stringify_vpic_read_mode(const struct __vpic *vpic)
 {
