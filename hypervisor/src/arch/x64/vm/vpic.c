@@ -2,7 +2,12 @@
 #include "halloc.h"
 #include "string.h"
 #include "types.h"
+#include "vm.h"
+#include "asm/apic.h"
+#include "asm/irq_vectors.h"
 #include "vm/vpic.h"
+
+static void __print_vpic_dev_state(struct __vpic *vpic);
 
 struct vpic *
 allocate_vpic(void)
@@ -12,14 +17,28 @@ allocate_vpic(void)
         return NULL;
 
     memset(vpic, 0, sizeof(struct vpic));
+    spinlock_init(&vpic->lock);
 
     vpic->vpic1.state = VPIC_UNINITIALIZED;
+    vpic->vpic1.lock = &vpic->lock;
     vpic->vpic2.state = VPIC_UNINITIALIZED;
+    vpic->vpic2.lock = &vpic->lock;
 
     vpic->vpic1.sub_device_map = U8_LSHIFT(1, 2);
     vpic->vpic2.parent_vpic = &vpic->vpic1;
 
     return vpic;
+}
+
+void
+destroy_vpic(struct vm *vm)
+{
+    struct vpic *vpic = vm_vpic(vm);
+    if (!vpic)
+        return;
+
+    hfree(vpic);
+    vm_vpic(vm) = NULL;
 }
 
 static inline bool
@@ -100,9 +119,8 @@ handle_init_step(struct __vpic *vpic, const uint8_t val)
             }
             break;
         case VPIC_ICW4:
-            if (ICW4_UNSUPPORTED(val)) {
+            if (ICW4_UNSUPPORTED(val))
                 die_reason("Unsupported vPIC feature requested via ICW4");
-            }
             break;
         default:
             die_reason("Unreachable");
@@ -115,12 +133,24 @@ static inline void
 handle_ocw2_write(struct __vpic *vpic, const uint8_t ocw2)
 {
     if (OCW2_UNSUPPORTED(ocw2)) {
+        pr_error("Requested unsupported OCW2: 0x%lx", ocw2);
+        __print_vpic_dev_state(vpic);
         die_reason("Unsupported vPIC operation requested via OCW2");
     }
 
-    if (OCW2_SETS(ocw2, OCW2_EOI)) {
-        /* Reset highest priority bit set in ISR (0 is highest) */
-        vpic->isr = (vpic->isr - 1) & vpic->isr;
+    const int cmd = ocw2 >> 5;
+    switch (cmd) {
+        case OCW2_NON_SPECIFIC_EOI_CMD:
+            /* Reset highest priority bit set in ISR (0 is highest) */
+            vpic->isr = (vpic->isr - 1) & vpic->isr;
+            break;
+        case OCW2_SPECIFIC_EOI_CMD:
+            uint8_t mask = U8_LSHIFT(1, ocw2 & 0x3);
+            vpic->isr &= (~mask);
+            break;
+        default:
+            pr_error("Unsupported OCW2 command '%lu'", cmd);
+            die();
     }
 }
 
@@ -128,6 +158,8 @@ static inline void
 handle_ocw3_write(struct __vpic *vpic, const uint8_t ocw3)
 {
     if (OCW3_UNSUPPORTED(ocw3)) {
+        pr_error("Requested unsupported OCW3: 0x%lx", ocw3);
+        __print_vpic_dev_state(vpic);
         die_reason("Unsupported vPIC operation requested via OCW3");
     }
 
@@ -145,16 +177,18 @@ handle_ocw3_write(struct __vpic *vpic, const uint8_t ocw3)
 void
 vpic_write(struct __vpic *vpic, const uint16_t port, const uint8_t val)
 {
+    spinlock_acquire(vpic->lock);
+
     if (IS_ICW1(port, val)) {
         start_init_sequence(vpic, val);
-        return;
+        goto out;
     } else if (in_init_sequence(vpic)) {
         if (A0_CLEAR(port)) {
             pr_debug("Ignoring unexpected cmd received during the init sequence");
-            return;
+            goto out;
         }
         handle_init_step(vpic, val);
-        return;
+        goto out;
     }
 
     if (IS_OCW1(port, val)) {
@@ -166,11 +200,15 @@ vpic_write(struct __vpic *vpic, const uint16_t port, const uint8_t val)
     } else {
         die_reason("Unreachable");
     }
+out:
+    spinlock_release(vpic->lock);
 }
 
 void
-vpic_read(const struct __vpic *vpic, const uint16_t port, uint8_t *val)
+vpic_read(struct __vpic *vpic, const uint16_t port, uint8_t *val)
 {
+    spinlock_acquire(vpic->lock);
+
     if (A0_CLEAR(port)) {
         if (vpic->read_mode == VPIC_READ_IRR) {
             *val = vpic->irr;
@@ -180,17 +218,80 @@ vpic_read(const struct __vpic *vpic, const uint16_t port, uint8_t *val)
     } else {
         *val = vpic->imr;
     }
+
+    spinlock_release(vpic->lock);
+}
+
+static inline char *
+stringify_vpic_read_mode(const struct __vpic *vpic)
+{
+    switch (vpic->read_mode) {
+        case VPIC_READ_IRR:
+            return "read IRR";
+        case VPIC_READ_ISR:
+            return "read ISR";
+        case VPIC_READ_NO_ACTION:
+            return "no action (neither IRR nor ISR configured)";
+    }
+}
+
+static inline char *
+stringify_vpic_state(const struct __vpic *vpic)
+{
+    switch (vpic->state) {
+        case VPIC_UNINITIALIZED:
+            return "Uninitialized";
+        case VPIC_INITIALIZED:
+            return "Initialized";
+        case VPIC_ICW2:
+            return "In init sequence - expecting: ICW2";
+        case VPIC_ICW3:
+            return "In init sequence - expecting: ICW3";
+        case VPIC_ICW4:
+            return "In init sequence - expecting: ICW4";
+        case VPIC_ICW2_ICW3:
+            return "In init sequence - expecting: ICW2 -> ICW3";
+        case VPIC_ICW2_ICW4:
+            return "In init sequence - expecting: ICW2 -> ICW4";
+        case VPIC_ICW2_ICW3_ICW4:
+            return "In init sequence - expecting: ICW2 -> ICW3 -> ICW4";
+        case VPIC_ICW3_ICW4:
+            return "In init sequence - expecting: ICW3 -> ICW4";
+    }
 }
 
 static void
-print_vpic_dev_state(const struct __vpic *vpic)
+__print_vpic_dev_state(struct __vpic *vpic)
 {
-    NOT_YET_IMPLEMENTED;
+    pr_info("State: %s", stringify_vpic_state(vpic));
+    pr_info("IMR: 0x%lx", vpic->imr);
+    pr_info("IRR: 0x%lx", vpic->irr);
+    pr_info("ISR: 0x%lx", vpic->isr);
+    pr_info("Offset: 0x%lx (=%lu)", vpic->offset, vpic->offset);
+    pr_info("Read Mode: %s", stringify_vpic_read_mode(vpic));
+    pr_info("Has parent vPIC: %s", ((vpic->parent_vpic == NULL) ? "no" : "yes"));
+    if (vpic->parent_vpic) {
+        pr_info("Parent vPIC address: 0x%lx", vpic->parent_vpic);
+        pr_info("Sub-device ID: 0x%lx (=%lu)", vpic->sub_device_id, vpic->sub_device_id);
+    } else {
+        pr_info("Sub-device map: 0x%lx", vpic->sub_device_map);
+    }
+}
+
+static inline void
+print_vpic_dev_state(struct __vpic *vpic)
+{
+    spinlock_acquire(vpic->lock);
+    __print_vpic_dev_state(vpic);
+    spinlock_release(vpic->lock);
 }
 
 void
-print_vpic_state(const struct vpic *vpic)
+print_vpic_state(struct vpic *vpic)
 {
-    NOT_YET_IMPLEMENTED;
+    pr_warn("================== VPIC STATE START =====================");
+    print_vpic_dev_state(&vpic->vpic1);
+    print_vpic_dev_state(&vpic->vpic2);
+    pr_warn("=================== VPIC STATE END ======================");
 }
 

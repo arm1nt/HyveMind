@@ -1,11 +1,15 @@
 #ifndef _HYVEMIND_X64_VM_VPIC_H
 #define _HYVEMIND_X64_VM_VPIC_H
 
+#include "spinlock.h"
 #include "types.h"
+#include "vm/irq.h"
 #include "vm/vpic_defs.h"
 
 struct vm;
 #define vm_vpic(x) ((x)->arch_vm.vpic)
+
+#define VPIC_NUM_PINS 16
 
 enum vpic_state {
     VPIC_UNINITIALIZED,
@@ -39,19 +43,26 @@ struct __vpic {
         uint8_t sub_device_id;
     };
     struct __vpic *parent_vpic;
+    /* Temproary glue: reference to the lock in the containing vpic struct */
+    spinlock_t *lock;
 };
 
 struct vpic {
     struct __vpic vpic1;
     struct __vpic vpic2;
+    spinlock_t lock;
 };
 
 struct vpic *allocate_vpic(void);
+void destroy_vpic(struct vm *vm);
 
-void vpic_read(const struct __vpic *vpic, const uint16_t port, uint8_t *val);
+void vpic_read(struct __vpic *vpic, const uint16_t port, uint8_t *val);
 void vpic_write(struct __vpic *vpic, const uint16_t port, const uint8_t val);
+void print_vpic_state(struct vpic *vpic);
 
-void print_vpic_state(const struct vpic *vpic);
+int vpic_raise_external_irq(struct vm *vm, const guest_hwirq_t irq);
+bool vpic_has_pending_irq(struct vpic *vpic);
+int vpic_get_pending_irq(struct vpic *vpic);
 
 #endif /* _HYVEMIND_X64_VM_VPIC_H */
 

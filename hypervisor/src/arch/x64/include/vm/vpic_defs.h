@@ -46,6 +46,8 @@
 #define OCW2_SL     D6_MASK
 #define OCW2_R      D7_MASK
 #define OCW2_SETS(val, mask) IS_SET(val, mask)
+#define OCW2_NON_SPECIFIC_EOI_CMD   1
+#define OCW2_SPECIFIC_EOI_CMD       3
 
 #define OCW3_RIS    D0_MASK
 #define OCW3_RR     D1_MASK
@@ -60,7 +62,6 @@
  *  - special fully nested mode
  *  - special mask mode
  *  - automatic EOIs
- *  - specific EOIs
  *  - automatic priority rotation
  *  - manually setting priority
  *  - poll cmd
@@ -76,7 +77,7 @@
 #define ICW4_REQ1 0
 #define ICW4_UNSUPPORTED(val) X_UNSUPPORTED_FEATURES(val, ICW4_REQ0, ICW4_REQ1)
 
-#define OCW2_REQ0 (OCW2_SL | OCW2_R | OCW2_L0 | OCW2_L1 | OCW2_L2)
+#define OCW2_REQ0 (OCW2_R)
 #define OCW2_REQ1 (OCW2_EOI)
 #define OCW2_UNSUPPORTED(val) X_UNSUPPORTED_FEATURES(val, OCW2_REQ0, OCW2_REQ1)
 
