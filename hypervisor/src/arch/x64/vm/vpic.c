@@ -222,6 +222,61 @@ vpic_read(struct __vpic *vpic, const uint16_t port, uint8_t *val)
     spinlock_release(vpic->lock);
 }
 
+static inline struct vcpu *
+get_irq_target_vcpu(const struct vm *vm)
+{
+    /**
+     * For now, it is always true that vm->vcpus[0] is the target vCPU into
+     * which to inject an irq
+     */
+    return vm->vcpus[0];
+}
+
+static bool
+irq_target_vcpu_needs_kick(vcpu_t *vcpu)
+{
+    //NOT_YET_IMPLEMENTED - todo;
+    return false;
+}
+
+static inline int
+__vpic_raise_ext_irq(struct __vpic *vpic, const hwirq_t irq)
+{
+    if (vpic->state != VPIC_INITIALIZED)
+        return -1;
+
+    vpic->irr |= U8_LSHIFT(1, irq);
+    return 0;
+}
+
+int
+vpic_raise_external_irq(struct vm *vm, const guest_hwirq_t irq)
+{
+    int ret;
+    struct vpic *vpic = vm_vpic(vm);
+
+    if (irq >= VPIC_NUM_PINS)
+        return -1;
+
+    spinlock_acquire(&vpic->lock);
+
+    if (irq >= 0x08)
+        ret = __vpic_raise_ext_irq(&vm_vpic(vm)->vpic2, irq - 0x08);
+    else
+        ret = __vpic_raise_ext_irq(&vm_vpic(vm)->vpic1, irq);
+
+    if (ret != 0)
+        goto out;
+
+    vcpu_t *target = get_irq_target_vcpu(vm);
+    if (irq_target_vcpu_needs_kick(target)) {
+        apic_send_targeted_ipi(vcpu_vmx(target).active_cpu, IRQ_CPU_KICK_VECTOR);
+    }
+out:
+    spinlock_release(&vpic->lock);
+    return ret;
+}
+
 static inline char *
 stringify_vpic_read_mode(const struct __vpic *vpic)
 {
