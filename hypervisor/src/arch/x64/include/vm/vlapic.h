@@ -36,6 +36,8 @@ int remap_vlapic_base(struct vm *vm, const gpaddr vlapic_base);
 void configure_vlapic_msr_intercepts(struct vm *vm);
 int init_vlapic(struct vcpu *vcpu, const lapicid_t initial_apic_id, const bool is_bsp);
 
+bool vlapic_accept_pic_irq(struct vcpu *vcpu);
+
 int guest_wrmsr_apic_base_msr(struct vcpu *vcpu, const uint64_t val);
 int guest_apic_register_write(struct vcpu *vcpu, const int reg);
 

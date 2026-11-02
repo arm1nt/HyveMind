@@ -70,6 +70,8 @@
 #define APIC_LVT_TIMER_MODE_POS 17
 
 #define __set_lvt_vector(entry, vector) (((entry) & ~0xFF) | (vector))
+
+#define is_lvt_masked(entry) IS_SET(entry, U32_LSHIFT(1, APIC_LVT_MASK_BIT))
 #define __mask_lvt_entry(entry) SET_BIT(entry, APIC_LVT_MASK_BIT)
 #define __unmask_lvt_entry(entry) CLEAR_BIT(entry, APIC_LVT_MASK_BIT)
 
@@ -82,6 +84,7 @@
 #define APIC_LVT_DM_OFFSET  8
 #define APIC_LVT_DM_WIDTH   3
 
+#define get_lvt_dm(entry) (((entry) >> APIC_LVT_DM_OFFSET) & 0x7)
 #define __set_lvt_dm(entry, dm_type) \
     SET_VAL_OFFSET(entry, dm_type, APIC_LVT_DM_WIDTH, APIC_LVT_DM_OFFSET)
 

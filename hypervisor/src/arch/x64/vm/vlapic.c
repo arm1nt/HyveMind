@@ -9,6 +9,45 @@
 #include "vmx/ept.h"
 #include "vmx/vmx.h"
 
+static inline uint32_t
+__read_vlapic_register(const virt_addr_t base, const int reg)
+{
+    return *((uint32_t *) (base + reg));
+}
+
+static inline uint32_t
+read_vlapic_register(const struct vlapic *vlapic, const int reg)
+{
+    return __read_vlapic_register(phys_to_virt(vlapic->virtual_apic_page), reg);
+}
+
+static inline void
+__write_vlapic_register(const virt_addr_t base, const int reg, const uint32_t val)
+{
+    *((uint32_t *) (base + reg)) = val;
+}
+
+static inline bool
+vlapic_hw_enabled(const struct vlapic *vlapic)
+{
+    return vlapic->apic_base_msr.global_enable == 1;
+}
+
+bool
+vlapic_accept_pic_irq(vcpu_t *vcpu)
+{
+    struct vlapic *vlapic = vcpu_vlapic(vcpu);
+    const uint32_t lvt0 = read_vlapic_register(vlapic, APIC_LVT_LINT0_REG);
+
+    if (!vlapic_hw_enabled(vlapic))
+        return true;
+
+    if (!is_lvt_masked(lvt0) && (get_lvt_dm(lvt0) == APIC_LVT_DM_EXTINT))
+        return true;
+
+    return false;
+}
+
 int
 remap_vlapic_base(struct vm *vm, const gpaddr vlapic_base)
 {
@@ -32,12 +71,6 @@ configure_vlapic_msr_intercepts(struct vm *vm)
 {
     vmx_set_intercept_msr(vm, MSRX64_IA32_APIC_BASE, true);
     vmx_set_intercept_msr(vm, MSR_APIC_TSC_DEADLINE, true);
-}
-
-static inline void
-__write_vlapic_register(const virt_addr_t base, const int reg, const uint32_t val)
-{
-    *((uint32_t *) (base + reg)) = val;
 }
 
 static void
