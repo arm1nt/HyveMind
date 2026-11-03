@@ -2,7 +2,6 @@
 #define _HYVEMIND_INTERNAL_HALLOC_H
 
 #include "types.h"
-#include <stdint.h>
 
 /**
  * [ b7 b6 b5 b4 b3 b2 b1 b0 ]
@@ -18,7 +17,6 @@ typedef uint8_t halloc_flags_t;
 #define HALLOC_FLAGS_PAGE_GRANULARITY   (U8(1) << 4)
 #define HALLOC_FLAGS_MANAGED            (U8(1) << 5)
 #define HALLOC_FLAGS_BIN_INDEX_MASK     (U8(7))
-
 
 #define NR_OF_BINS 7
 
@@ -62,49 +60,57 @@ struct bin_config {
     int repopulate_nr_pages;
 };
 
+#define INIT_BIN_CONFIG(idx, shift, init_pages, repopulate_pages)   \
+    {                                                               \
+        .bin_index = idx,                                           \
+        .chunk_shift = shift,                                       \
+        .nr_of_init_pages = init_pages,                             \
+        .repopulate_nr_pages = repopulate_pages,                    \
+    }
+
 static struct bin_config bin_configs[NR_OF_BINS] = {
-    {
-        .bin_index = BIN_32B_INDEX,
-        .chunk_shift= BIN_32B_SHIFT,
-        .nr_of_init_pages = BIN_32B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_32B_REPOPULATE_NR_PAGES,
-    },
-    {
-        .bin_index = BIN_64B_INDEX,
-        .chunk_shift= BIN_64B_SHIFT,
-        .nr_of_init_pages = BIN_64B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_64B_REPOPULATE_NR_PAGES,
-    },
-    {
-        .bin_index = BIN_128B_INDEX,
-        .chunk_shift= BIN_128B_SHIFT,
-        .nr_of_init_pages = BIN_128B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_128B_REPOPULATE_NR_PAGES,
-    },
-    {
-        .bin_index = BIN_256B_INDEX,
-        .chunk_shift= BIN_256B_SHIFT,
-        .nr_of_init_pages = BIN_256B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_256B_REPOPULATE_NR_PAGES
-    },
-    {
-        .bin_index = BIN_512B_INDEX,
-        .chunk_shift= BIN_512B_INDEX,
-        .nr_of_init_pages = BIN_512B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_512B_REPOPULATE_NR_PAGES,
-    },
-    {
-        .bin_index = BIN_1024B_INDEX,
-        .chunk_shift= BIN_1024B_SHIFT,
-        .nr_of_init_pages = BIN_1024B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_1024B_REPOPULATE_NR_PAGES,
-    },
-    {
-        .bin_index = BIN_2048B_INDEX,
-        .chunk_shift= BIN_2048B_SHIFT,
-        .nr_of_init_pages = BIN_2048B_NR_INIT_PAGES,
-        .repopulate_nr_pages = BIN_2048B_REPOPULATE_NR_PAGES,
-    },
+    [BIN_32B_INDEX] = INIT_BIN_CONFIG (
+            BIN_32B_INDEX,
+            BIN_32B_SHIFT,
+            BIN_32B_NR_INIT_PAGES,
+            BIN_32B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_64B_INDEX] = INIT_BIN_CONFIG(
+            BIN_64B_INDEX,
+            BIN_64B_SHIFT,
+            BIN_64B_NR_INIT_PAGES,
+            BIN_64B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_128B_INDEX] = INIT_BIN_CONFIG(
+            BIN_128B_INDEX,
+            BIN_128B_SHIFT,
+            BIN_128B_NR_INIT_PAGES,
+            BIN_128B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_256B_INDEX] = INIT_BIN_CONFIG(
+            BIN_256B_INDEX,
+            BIN_256B_SHIFT,
+            BIN_256B_NR_INIT_PAGES,
+            BIN_256B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_512B_INDEX] = INIT_BIN_CONFIG(
+            BIN_512B_INDEX,
+            BIN_512B_SHIFT,
+            BIN_512B_NR_INIT_PAGES,
+            BIN_512B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_1024B_INDEX] = INIT_BIN_CONFIG(
+            BIN_1024B_INDEX,
+            BIN_1024B_SHIFT,
+            BIN_1024B_NR_INIT_PAGES,
+            BIN_1024B_REPOPULATE_NR_PAGES
+            ),
+    [BIN_2048B_INDEX] = INIT_BIN_CONFIG(
+            BIN_2048B_INDEX,
+            BIN_2048B_SHIFT,
+            BIN_2048B_NR_INIT_PAGES,
+            BIN_2048B_REPOPULATE_NR_PAGES
+            ),
 };
 
 #endif /* _HYVEMIND_INTERNAL_HALLOC_H */
