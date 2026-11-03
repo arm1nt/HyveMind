@@ -189,7 +189,7 @@ determine_apic_timer_frequency(void)
 void
 bsp_apic_enable_legacy_irqs(void)
 {
-    if (!(get_current_logical_processor()->is_bsp))
+    if (!current_cpu->bsp)
         return;
 
     unmask_lvt_entry(APIC_LVT_LINT0_REG);
@@ -198,7 +198,7 @@ bsp_apic_enable_legacy_irqs(void)
 void
 bsp_apic_enable_legacy_irq_support(void)
 {
-    if (!(get_current_logical_processor()->is_bsp))
+    if (!current_cpu->bsp)
         return;
 
     uint64_t lvt_lint0 = apic_read(APIC_LVT_LINT0_REG);

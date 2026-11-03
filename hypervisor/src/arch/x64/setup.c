@@ -261,8 +261,7 @@ create_addr_space(void)
         return false;
     }
 
-    logical_processor_t *processor = percpu_ptr(logical_processor);
-    processor->raw_cr3 = *((const uint64_t *) &new_addr_space);
+    current_cpu->raw_cr3 = *((const uint64_t *) &new_addr_space);
 
     write_cr3(*(const uint64_t *) &new_addr_space);
 
@@ -279,9 +278,6 @@ __arch_setup_bsp(void)
     if (setup_bsp_apic() != APIC_SUCCESS) {
         die_reason("Failed to setup apic for BSP");
     }
-
-    logical_processor_t *bsp = get_current_logical_processor();
-    bsp->is_bsp = true;
 
     query_processor_max_leaf_values();
 
@@ -339,17 +335,16 @@ arch_setup_ap(void)
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
 
-    query_processor_max_leaf_values();
+    setup_ap_apic();
 
-    logical_processor_t *current = get_current_logical_processor();
-    current->raw_cr3 = info->raw_shared_cr3;
-    current->lapic_id = read_lapic_id();
-    current->processor_id = get_current_cpuid();
+    current_cpu->raw_cr3 = info->raw_shared_cr3;
+
+    query_processor_max_leaf_values();
 
     init_new_gdt();
 
     if (install_new_tss() != 0) {
-        current->state = PROCESSOR_UNAVAILABLE;
+        current_cpu->state = CPU_UNAVAILABLE;
         die_reason("Failed to install TSS for AP");
     }
 
@@ -357,17 +352,19 @@ arch_setup_ap(void)
     load_shared_idt();
 
     if (!enable_vmx_feature_support()) {
-        current->state = PROCESSOR_UNAVAILABLE;
+        current_cpu->state = CPU_UNAVAILABLE;
         die_reason("Cannot enable VMX support for processor");
     }
 
     if (!enter_vmx_operation()) {
-        current->state = PROCESSOR_UNAVAILABLE;
+        current_cpu->state = CPU_UNAVAILABLE;
         die_reason("Error while trying to enter VMX operation");
     }
 
-    current->state = PROCESSOR_INIT;
-    die_reason("ap end");
+    current_cpu->state = CPU_INIT;
+
+    enter_schedule_loop();
+    die_reason("ap end in setup.c");
     /* startup_enter_idle_loop(); */
 }
 
@@ -384,19 +381,15 @@ arch_setup_ap_limine(const struct limine_mp_info *info)
 void
 arch_bringup_aps_limine(const struct limine_mp_response *mp_info)
 {
-    const lapicid_t curr_lapic_id = read_lapic_id();
-    const logical_processor_t *bsp = get_current_logical_processor();
-
     struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
-    info->raw_shared_cr3 = bsp->raw_cr3;
+    info->raw_shared_cr3 = current_cpu->raw_cr3;
 
     struct limine_mp_info  *entry;
     for (uint64_t i = 0; i < mp_info->cpu_count; i++) {
         entry = mp_info->cpus[i];
 
-        if (curr_lapic_id == entry->lapic_id) {
+        if (current_cpu->lapic_id == entry->lapic_id)
             continue;
-        }
 
         asm volatile (
                 "movq %0, (%1)"

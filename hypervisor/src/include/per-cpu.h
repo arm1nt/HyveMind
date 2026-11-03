@@ -6,6 +6,7 @@
 #ifndef HYVEMIND_MAX_NR_CPUS
     #define HYVEMIND_MAX_NR_CPUS    64
 #endif
+#define MAX_CPUS HYVEMIND_MAX_NR_CPUS
 
 #define __percpu
 

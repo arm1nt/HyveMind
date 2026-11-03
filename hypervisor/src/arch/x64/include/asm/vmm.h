@@ -1,61 +1,31 @@
 #ifndef _HYVEMIND_X64_ASM_VMM_H
 #define _HYVEMIND_X64_ASM_VMM_H
 
-#include "types.h"
+#include "hyvstdlib.h"
 #include "mm_types.h"
 #include "per-cpu.h"
 
-enum logical_processor_state {
-    PROCESSOR_NOT_INIT,
-    /* If we were unable to setup the processor properly */
-    PROCESSOR_UNAVAILABLE,
-    /* If we don't want to use the certain logical processor */
-    PROCESSOR_DISABLED,
-    PROCESSOR_INIT,
-    PROCESSOR_IDLE,
-    PROCESSOR_BUSY
+enum cpu_state {
+    CPU_NOT_INIT,
+    CPU_INIT,
+    CPU_UNAVAILABLE,
 };
-typedef enum logical_processor_state processor_state_t;
 
-struct logical_processor {
-    cpuid_t processor_id;
+struct cpu {
+    cpuid_t id;
     lapicid_t lapic_id;
-    bool is_bsp;
-
-    processor_state_t state;
-
-    void *current_vcpu;
+    bool bsp;
+    enum cpu_state state;
 
     uint64_t raw_cr3;
-    void *stack_ptr;
 
     phys_addr_t vmxon_region_ptr;
-    bool vmx_operation_active;
 };
-typedef struct logical_processor logical_processor_t;
+typedef struct cpu cpu_t;
 
-#define INIT_LOGICAL_PROCESSOR() ((logical_processor_t) {   \
-    .processor_id = INVALID_PROCESSOR_ID,                   \
-    .lapic_id = INVALID_LAPIC_ID,                           \
-    .is_bsp = false,                                        \
-    .state = PROCESSOR_NOT_INIT,                            \
-    .vmxon_region_ptr = 0,                                  \
-    .vmx_operation_active = false                           \
-    })
+DECLARE_PER_CPU(struct cpu, cpu);
 
-DECLARE_PER_CPU(logical_processor_t, logical_processor);
-
-logical_processor_t get_logical_processor_by_id(const cpuid_t id);
-
-static inline logical_processor_t *
-get_current_logical_processor(void)
-{
-    return (logical_processor_t*) percpu_ptr(logical_processor);
-}
-
-/**
- * todo: create a list that stores all vms that we maintain
- */
+#define current_cpu ((cpu_t *) percpu_ptr(cpu))
 
 #endif /* _HYVEMIND_X64_ASM_VMM_H */
 

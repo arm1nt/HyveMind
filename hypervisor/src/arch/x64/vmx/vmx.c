@@ -214,7 +214,6 @@ enter_vmx_operation(void)
 {
     int res;
     phys_addr_t vmxon_region;
-    logical_processor_t *current = get_current_logical_processor();
 
     if ((res = init_vmx_capabilities()) != 0) {
         pr_error("Failed to initialize the vmx capability info: %lu", U64(res));
@@ -237,8 +236,7 @@ enter_vmx_operation(void)
     }
 
     pr_info("Successfully entered VMX operation");
-    current->vmxon_region_ptr = vmxon_region;
-    current->vmx_operation_active = true;
+    current_cpu->vmxon_region_ptr = vmxon_region;
 
     return true;
 }
@@ -246,17 +244,15 @@ enter_vmx_operation(void)
 void
 leave_vmx_operation(void)
 {
-    logical_processor_t *current = get_current_logical_processor();
-    if (!current->vmx_operation_active) {
+    if (!current_cpu->vmxon_region_ptr) {
         pr_warn("Cannot execute 'vmxoff' since logical processor is not in VMX operation");
         return;
     }
 
     vmxoff();
 
-    free_page_raw(current->vmxon_region_ptr);
-    current->vmxon_region_ptr = 0;
-    current->vmx_operation_active = false;
+    free_page_raw(current_cpu->vmxon_region_ptr);
+    current_cpu->vmxon_region_ptr = 0;
 
     pr_info("Successfully left VMX operation");
 }
