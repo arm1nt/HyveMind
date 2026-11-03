@@ -268,6 +268,40 @@ create_addr_space(void)
     return true;
 }
 
+uint32_t cpumask_present = 0;
+uint32_t cpumask = 0;
+
+static void
+__topology_register_cpu(const lapicid_t lapic_id, const bool bsp)
+{
+    const cpuid_t cpuid = get_cpuid_for_lapic_id(lapic_id);
+    if (cpuid == INVALID_CPUID)
+        return;
+
+    cpu_t *cpu = percpu_ptr_raw(cpu, cpuid);
+    cpu->id = cpuid;
+    cpu->lapic_id = lapic_id;
+    cpu->bsp = bsp;
+
+    cpumask_present = SET_BIT(cpumask_present, cpuid);
+}
+
+void
+map_cpu_topology(const struct limine_mp_response *mp_info)
+{
+    __topology_register_cpu(mp_info->bsp_lapic_id, true);
+
+    struct limine_mp_info *cpu_info;
+    for (int i = 0; i < mp_info->cpu_count; i++) {
+        cpu_info = mp_info->cpus[i];
+
+        if (cpu_info->lapic_id == mp_info->bsp_lapic_id)
+            continue;
+
+        __topology_register_cpu(cpu_info->lapic_id, false);
+    }
+}
+
 void
 __arch_setup_bsp(void)
 {

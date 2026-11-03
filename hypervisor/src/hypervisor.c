@@ -61,6 +61,8 @@ hypervisor_main(void)
     init_system_memory_info(&boot_mem_info);
     pr_debug("Organized information about early boot memory layout");
 
+    map_cpu_topology(mp_request.response);
+
     const uint64_t curr_dm_offset = hhdm_request.response->offset;
     if (early_init_page_frame_allocator(memmap_request.response, curr_dm_offset) != 0) {
         die_reason("Failed to initialize the page frame allocator");
