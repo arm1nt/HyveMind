@@ -76,8 +76,11 @@ struct arch_vm {
 };
 
 int arch_alloc_vcpu(struct vcpu *vcpu);
-void arch_destroy_vcpu(struct vcpu *vcpu);
 int arch_prepare_execution_env(struct vm *vm, const struct vm_config *config);
+void arch_destroy_vcpu(struct vcpu *vcpu);
+void arch_destroy_vm(struct vm *vm);
+
+int arch_launch_vcpu(struct vcpu *vcpu);
 
 #endif /* _HYVEMIND_X64_ASM_VM_H */
 
