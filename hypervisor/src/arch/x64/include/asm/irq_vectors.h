@@ -16,9 +16,9 @@
 #define IRQ_PIC2_BASE_VECTOR        IRQ_LEGACY_VECTOR(8)
 
 #define IRQ_APIC_SPURIOUS_VECTOR    0xff
-#define IRQ_APIC_TIMER_VECTOR       0x30
+#define IRQ_CPU_KICK_VECTOR         0xf0
 
-#define IRQ_SCHED_IPI_VECTOR        0x50
+#define IRQ_APIC_TIMER_VECTOR       0x30
 
 #endif /*  _HYVEMIND_X64_ASM_IRQ_VECTORS_H */
 

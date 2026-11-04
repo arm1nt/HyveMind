@@ -1,5 +1,7 @@
 #include "asm/apic.h"
 #include "asm/current.h"
+#include "asm/idt.h"
+#include "asm/irq_vectors.h"
 #include "asm/vmm.h"
 
 #define INIT_CPU()                      \
@@ -78,5 +80,17 @@ get_current_cpuid(void)
 {
     const lapicid_t lapic_id = read_lapic_id();
     return lapic_id_to_cpuid(lapic_id);
+}
+
+void
+kick_cpu(const cpuid_t target_cpu)
+{
+    apic_send_targeted_ipi(target_cpu, IRQ_CPU_KICK_VECTOR);
+}
+
+void __irq_handler
+__cpu_kick_handler(void)
+{
+    /* do nothing */
 }
 

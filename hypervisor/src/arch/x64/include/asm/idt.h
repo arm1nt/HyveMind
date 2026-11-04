@@ -7,6 +7,8 @@
 
 #include "asm/irq.h"
 
+#define __irq_handler
+
 #define DECLARE_IRQ_ENTRY_WITH_EOI(name, cfunc) extern void name(void);
 #define DECLARE_IRQ_ENTRY_WITHOUT_EOI(name, cfunc) extern void name(void);
 #define DECLARE_EXCEPTTION_HANDLER_WITH_ERR(name, cfunc) extern void name(int);
@@ -49,7 +51,7 @@ extern void common_legacy_irq_trampoline_spurious(const irq_t irq_vector);
 DECLARE_EXCEPTION_HANDLER_WITHOUT_ERR(asm_div_exception_handler, __div_exception_handler)
 
 DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_apic_timer_handler, irq_timer_handler)
-DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_apic_schedule_ipi_handler, __apic_schedule_ipi_handler)
+DECLARE_IRQ_ENTRY_WITH_EOI(asm_irq_cpu_kick_handler, __cpu_kick_handler)
 
 #endif /* _HYVEMIND_X64_ASM_IDT_H */
 

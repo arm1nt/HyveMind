@@ -24,11 +24,6 @@ __apic_oneshot_timer_handler(void)
     printf("apic oneshot timer fired");
 }
 
-void
-__apic_schedule_ipi_handler(void)
-{
-}
-
 static inline void
 set_idt_gate_offset(idt_gate_t *gate, const uint64_t offset)
 {
@@ -92,6 +87,7 @@ init_shared_idt(void)
 
     REGISTER_TRAP_GATE(&idt, IRQ_DIVIDE_ERROR_VECTOR, asm_div_exception_handler, TSS_IST_NO_IST_STACK);
     REGISTER_INTERRUPT_GATE(&idt, IRQ_APIC_TIMER_VECTOR, asm_irq_apic_timer_handler, TSS_IST_INDEX1);
+    REGISTER_INTERRUPT_GATE(&idt, IRQ_CPU_KICK_VECTOR, asm_irq_cpu_kick_handler, TSS_IST_INDEX1);
 }
 
 void
