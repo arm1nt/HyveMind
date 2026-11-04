@@ -204,6 +204,8 @@ disable_local_interrupts(void)
 }
 
 #define cpu_relax() do { asm volatile ("pause"); } while(0)
+#define cpu_halt() do { asm volatile ("hlt"); } while (0)
+#define cpu_halt_with_irq_window() do { asm volatile ("sti; hlt; cli"); } while (0)
 
 static inline uint64_t
 read_tsc(void)
