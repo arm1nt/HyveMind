@@ -1,27 +1,13 @@
-# todo: needs some changes (e.g. be able to return from the exit_handler) to
-#   work in a scheduling loop.
-
-.section .text
-
-#include "vmx/vmcs.h"
-#include "vmx/vmx_ops.h"
-#include "asm/generated/asm-offsets.h"
-
-.extern __vmx_entry_helper
-.extern vmx_vm_exit_handler
-.extern __printf
-
-.macro def_global_func name
+.macro def_global_fn name
     .global \name
     .type \name, @function
 .endm
 
-.macro setup_stack_frame
-    pushq %rbp
-    movq %rsp, %rbp
+.macro def_local_fn name
+    .type \name, @function
 .endm
 
-.macro push_preserved_regs
+.macro push_callee_preserved_regs
     pushq %r15
     pushq %r14
     pushq %r13
@@ -29,13 +15,24 @@
     pushq %rbx
 .endm
 
-.macro pop_preserved_regs
+.macro pop_callee_preserved_regs
     popq %rbx
     popq %r12
     popq %r13
     popq %r14
     popq %r15
 .endm
+
+.macro setup_stack_frame
+    pushq %rbp
+    movq %rsp, %rbp
+.endm
+
+.section .text
+
+#include "vmx/vmcs.h"
+#include "vmx/vmx_ops.h"
+#include "asm/generated/asm-offsets.h"
 
 .macro load_guest_regs ptr_reg
     movq USREG_R15(%\ptr_reg), %r15
@@ -76,84 +73,150 @@
     save_and_clear_reg \ptr_reg, rcx, USREG_RCX
     save_and_clear_reg \ptr_reg, rdx, USREG_RDX
     save_and_clear_reg \ptr_reg, rsi, USREG_RSI
-    # skip rdi as we store the struct ptr in it -> we restore it later
+    # Skip rdi as we store the struct ptr in it -> we save it later
     save_and_clear_reg \ptr_reg, rbp, USREG_RBP
-    # we read the guest RIP, RSP and RFLAGS from the vmcs
+    # We read the guest RIP, RSP and RFLAGS from the VMCS
 .endm
 
-def_global_func asm_vmx_vm_exit_handler
+.extern vmx_prepare_vcpu_execution
+.extern vmx_set_exit_handler_rsp
+.extern vmx_external_irqs_entry_helper
+.extern __vmx_entry_helper
+.extern vmx_vm_exit_handler
+
+def_local_fn get_vcpu_launch_state
+get_vcpu_launch_state:
+    setup_stack_frame
+
+    movq %rdi, %r10
+    addq $VCPU_VMX_LS_OFFSET, %r10
+    movl (%r10), %eax
+
+    leave
+    retq
+
+.global asm_vmx_vm_exit_handler
 asm_vmx_vm_exit_handler:
     # Make one register available to store the user regs struct ptr
     pushq %rdi
     movq +0x08(%rsp), %rdi
 
     save_guest_regs rdi
-    movq (%rsp), %r8
+    popq %r8
     save_and_clear_reg rdi, r8, USREG_RDI
 
-    # Starting from here all guest state is saved.
-    addq $0x08, %rsp
+    # All vCPU regs are now saved and the stack is in the same state as when
+    # entering the handler. We can now establish the stack frame
     movq %rsp, %rbp
+    addq $0x10, %rbp
 
-    movq (%rsp), %rdi
+    # Call the C handler with the vCPU ptr as argument
+    movq +0x08(%rsp), %rdi
     callq vmx_vm_exit_handler
+    cmp $0x00, %rax
+    je .Lexit_handler_success
 
-    # Atm, this point should be unreachable since we explicitly call do_enter_vcpu
-    # in the c exit handler.
-    leaq log_exit_unreachable(%rip), %rdi
-    callq __printf
-    hlt
+    # Simply pass through the return value from the C handler
+    leave
+    retq
 
-# int func(vcpu_t*, int launch_state, struct vcpu_user_regs*)
-def_global_func asm_do_vmx_vcpu_entry
-asm_do_vmx_vcpu_entry:
-    setup_stack_frame
+.Lexit_handler_success:
+asm_vmx_vm_entry_handler:
+    #Todo: Check where to update vCPU state and disable IRQs
+    cli
 
-    pushq %rbp
-    push_preserved_regs
+    # Store the vcpu & regs ptrs in callee-preserved registers
+    movq +0x08(%rsp), %r12
+    movq (%rsp), %r13
 
-    movq %rdi, %r12     # pointer to vcpu struct
-    movq %rsi, %r13     # launch state value
-    movq %rdx, %r14     # ptr to vcpu_user_regs struct
+    movq %r12, %rdi
+    callq vmx_external_irqs_entry_helper
 
     movq %r12, %rdi
     callq __vmx_entry_helper
-    movq %rax, %rbx
-    movq $-0x01, %rax
-    test $0x1, %rbx
-    jz .Lvm_entry_fail
+    cmp $0x00, %rax
+    je 1f
 
-    cmp $VMCS_LS_CLEAR_VAL, %r13d
+    movq $VMX_ERROR, %rax
+    leave
+    retq
+1:
+    movq %r12, %rdi
+    callq get_vcpu_launch_state
+    movq %rax, %r10
+
+    cmp $VMCS_LS_INVALID_VAL, %r10
+    jne 1f
+    movq $VMX_INVALID_VCPU_LS, %rax
+    leave
+    retq
+1:
+    cmp $VMCS_LS_CLEAR_VAL, %r10
     je .Lvmlaunch_op
-    jmp .Lvmresume_op
-
-.Lvmlaunch_op:
-    movq %r14, %r8
-    load_guest_regs r8
-
-    vmlaunch
-    jmp .Lvm_entry_op_fail
 
 .Lvmresume_op:
-    movq %r14, %r8
+    movq %r13, %r8
     load_guest_regs r8
 
     vmresume
 
-.Lvm_entry_op_fail:
-    pushfq
-    popq %rdi
-    callq eflags_to_vmx_op_status
+    movq $VMX_VMRESUME_FAILED, %rax
+    leave
+    retq
+.Lvmlaunch_op:
+    movq %r13, %r8
+    load_guest_regs r8
 
-.Lvm_entry_fail:
-    pop_preserved_regs
-    popq %rbp
+    vmlaunch
 
+    movq $VMX_VMLAUNCH_FAILED, %rax
     leave
     retq
 
-.section .data
+def_local_fn __vmx_execute_vcpu
+__vmx_execute_vcpu:
+    setup_stack_frame
 
-log_exit_unreachable:
-    .asciz "Reached should-be unreachable point after vm exit handler call"
+    pushq %rdi # vcpu ptr
+    pushq %rsi # regs ptr
+
+    # At this point, the stack frame looks as follows:
+    # |--------------------------|
+    # | rip of vmx_execute_vcpu |
+    # | rbp of vmx_execute_vcpu |
+    # | vcpu ptr                |
+    # | user regs ptr           |
+    # |--------------------------| <<-- Z ... ptr to store into the VMCS host RSP
+    #
+    # With this stack frame, the vm_exit handler (roughly) works like a function
+    # invoked by 'vmx_execute_vcpu' that has the vcpu and user regs ptrs as local
+    # variables.
+
+    # Called with the vcpu ptr as argument
+    callq vmx_prepare_vcpu_execution
+    cmp $0x00, %rax
+    je .Lvcpu_prep_success
+
+    movq $VMX_ERROR, %rax
+    leave
+    retq
+.Lvcpu_prep_success:
+    movq %rsp, %rdi
+    callq vmx_set_exit_handler_rsp
+
+    # The stack is now in the same state as it will be established by the
+    # vm exit handler
+    jmp asm_vmx_vm_entry_handler
+
+def_global_fn vmx_execute_vcpu
+vmx_execute_vcpu:
+    setup_stack_frame
+    push_callee_preserved_regs
+
+    callq __vmx_execute_vcpu
+    # We pass the return value through to the caller
+
+    pop_callee_preserved_regs
+    leave
+    retq
 
