@@ -36,5 +36,11 @@ lapicid_t cpuid_to_lapic_id(const cpuid_t cpuid);
 
 void kick_cpu(const cpuid_t target_cpu);
 
+/**
+ * Currently, the list is immutable, so we don't need synchronization for the
+ * list itself.
+ */
+extern struct list_head global_vm_list;
+
 #endif /* _HYVEMIND_X64_ASM_VMM_H */
 

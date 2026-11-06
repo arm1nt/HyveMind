@@ -1,6 +1,7 @@
 #include "fatal.h"
 #include "mm_types.h"
 #include "per-cpu.h"
+#include "sched.h"
 #include "string.h"
 #include "asm/apic.h"
 #include "asm/gdt_idt.h"
@@ -302,6 +303,13 @@ map_cpu_topology(const struct limine_mp_response *mp_info)
     }
 }
 
+static inline void
+register_cpu_online(void)
+{
+    current_cpu->state = CPU_INIT;
+    cpumask = SET_BIT(cpumask, current_cpu->id);
+}
+
 void
 __arch_setup_bsp(void)
 {
@@ -324,19 +332,14 @@ __arch_setup_bsp(void)
     }
 
     init_new_gdt();
-
     if (install_new_tss() != 0) {
         die_reason("Failed to install a TSS into the GDT of the BSP");
     }
-
     load_gdt();
 
     init_shared_idt();
     init_irqs();
     load_shared_idt();
-
-    enable_device_irqs();
-    enable_local_interrupts();
 
     if (!enable_vmx_feature_support()) {
         die_reason("Unable to enable VMX support for BSP");
@@ -345,16 +348,19 @@ __arch_setup_bsp(void)
     if (!enter_vmx_operation()) {
         die_reason("Error while trying to enter VMX operation on BSP");
     }
+
+    enable_device_irqs();
+    register_cpu_online();
 }
 
 void
-finish_bsp_setup(void)
+wait_until_aps_online(void)
 {
-    NOT_YET_IMPLEMENTED;
+    /* Todo */
+    asm volatile ("nop");
 }
 
 extern uint8_t boot_info_scratch[];
-
 struct shared_boot_info {
     uint64_t raw_shared_cr3;
 };
@@ -363,43 +369,42 @@ static void __no_return
 arch_setup_ap(void)
 {
     if (!check_cpu()) {
-        die_reason("Logical processor cannot support hyvemind operation");
+        pr_error("CPU does not support hyvemind operation");
+        goto error_terminate;
     }
 
     const struct shared_boot_info *info = (struct shared_boot_info *) &boot_info_scratch;
     write_cr3(info->raw_shared_cr3);
+    current_cpu->raw_cr3 = info->raw_shared_cr3;
 
     setup_ap_apic();
-
-    current_cpu->raw_cr3 = info->raw_shared_cr3;
 
     query_processor_max_leaf_values();
 
     init_new_gdt();
-
     if (install_new_tss() != 0) {
-        current_cpu->state = CPU_UNAVAILABLE;
-        die_reason("Failed to install TSS for AP");
+        pr_error("Failed to install TSS");
+        goto error_terminate;
     }
-
     load_gdt();
     load_shared_idt();
 
     if (!enable_vmx_feature_support()) {
-        current_cpu->state = CPU_UNAVAILABLE;
-        die_reason("Cannot enable VMX support for processor");
+        pr_error("CPU does not support VMX operation");
+        goto error_terminate;
     }
 
     if (!enter_vmx_operation()) {
-        current_cpu->state = CPU_UNAVAILABLE;
-        die_reason("Error while trying to enter VMX operation");
+        pr_error("Error entering VMX operation");
+        goto error_terminate;
     }
 
-    current_cpu->state = CPU_INIT;
-
+    register_cpu_online();
     enter_schedule_loop();
-    die_reason("ap end in setup.c");
-    /* startup_enter_idle_loop(); */
+
+error_terminate:
+    current_cpu->state = CPU_UNAVAILABLE;
+    die();
 }
 
 static void __no_return

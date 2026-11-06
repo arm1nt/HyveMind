@@ -15,6 +15,8 @@
 
 DEFINE_PER_CPU_VAL(struct cpu, cpu, INIT_CPU());
 
+struct list_head global_vm_list = LIST_HEAD_INIT(global_vm_list);
+
 static cpuid_t cpuid_counter = 0;
 
 struct cpuid_lapic_id_pair {

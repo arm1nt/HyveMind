@@ -10,6 +10,7 @@
 
 extern void arch_setup_bsp(void);
 void arch_bringup_aps_limine(const struct limine_mp_response *mp_info);
+void wait_until_aps_online(void);
 
 extern virt_addr_t arch_replace_stack(const unsigned int page_nr);
 /**

@@ -13,6 +13,11 @@ static dbg_console_t console = { .initialized = 0 };
 static void
 u64_to_dec_string(uint64_t num, char *buf)
 {
+    if (num == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
+    }
     int index = 0;
     while (num > 0) {
         buf[index++] = num % 10 + 48;
@@ -32,6 +37,12 @@ u64_to_dec_string(uint64_t num, char *buf)
 static void
 u64_to_hex_string(uint64_t num, char *buf)
 {
+    if (num == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
+    }
+
     uint64_t check_zero_mask = ~((uint64_t) 0);
     uint64_t lsbs_mask = (uint64_t) 15; /* ...0001111 */
     int counter = 0;
@@ -130,9 +141,8 @@ __printf(const char *fmt, ...)
 int
 init_printf(void)
 {
-    if (init_console(&console) != 0) {
+    if (init_console(&console) != 0)
         return -1;
-    }
 
     return 0;
 }
