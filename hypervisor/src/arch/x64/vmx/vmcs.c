@@ -30,7 +30,7 @@ create_new_vmcs_area(void)
     do {                                                                \
         uint64_t val;                                                   \
         int ret = vmread((enc), &val);                                  \
-        if (ret != VMX_OP_SUCCESS) {                                    \
+        if (ret != VMX_SUCCESS) {                                       \
             __printf("VMREAD faild for %s: %lu\n", #enc, U64(ret));     \
         } else {                                                        \
             __printf("%s = 0x%lx\n", #enc, U64(val));                   \
@@ -58,7 +58,7 @@ dump_vmcs(void)
 
     VMCS_DUMP_SECTION_HDR("VM-exit information");
 
-    if ((ret = vmread(EXIT_REASON, &exit_reason_raw)) != VMX_OP_SUCCESS) {
+    if ((ret = vmread(EXIT_REASON, &exit_reason_raw)) != VMX_SUCCESS) {
         __printf("VMREAD failed for EXIT_REASON: %lu\n", ret);
     } else {
         exit_reason.raw = exit_reason_raw;
@@ -68,7 +68,7 @@ dump_vmcs(void)
     }
 
     /* TODO: add specific functions for displaying e.g. ept violation qualification, etc. */
-    if ((ret = vmread(EXIT_QUALIFICATION, &exit_qualification_raw)) != VMX_OP_SUCCESS) {
+    if ((ret = vmread(EXIT_QUALIFICATION, &exit_qualification_raw)) != VMX_SUCCESS) {
         __printf("VMREAD failed for EXIT_QUALIFICATION: %lu\n", ret);
     } else {
         __printf("EXIT_QUALIFICATION_RAW = 0x%lx\n", exit_qualification_raw);
