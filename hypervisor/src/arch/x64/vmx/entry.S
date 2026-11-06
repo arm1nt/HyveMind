@@ -31,7 +31,7 @@
 .section .text
 
 #include "vmx/vmcs.h"
-#include "vmx/vmx_ops.h"
+#include "vmx/vmx_defs.h"
 #include "asm/generated/asm-offsets.h"
 
 .macro load_guest_regs ptr_reg
@@ -113,7 +113,7 @@ asm_vmx_vm_exit_handler:
     # Call the C handler with the vCPU ptr as argument
     movq +0x08(%rsp), %rdi
     callq vmx_vm_exit_handler
-    cmp $0x00, %rax
+    cmp $VMX_SUCCESS, %rax
     je .Lexit_handler_success
 
     # Simply pass through the return value from the C handler
@@ -122,34 +122,30 @@ asm_vmx_vm_exit_handler:
 
 .Lexit_handler_success:
 asm_vmx_vm_entry_handler:
-    #Todo: Check where to update vCPU state and disable IRQs
-    cli
-
     # Store the vcpu & regs ptrs in callee-preserved registers
-    movq +0x08(%rsp), %r12
-    movq (%rsp), %r13
-
-    movq %r12, %rdi
-    callq vmx_external_irqs_entry_helper
+    movq +0x08(%rsp), %r12  # vcpu ptr
+    movq (%rsp), %r13       # regs ptr
 
     movq %r12, %rdi
     callq __vmx_entry_helper
-    cmp $0x00, %rax
+    cmp $VMX_SUCCESS, %rax
     je 1f
 
-    movq $VMX_ERROR, %rax
-    leave
-    retq
+    movq $VMX_VM_ENTRY_ERROR, %rax
+    jmp .Lout
 1:
+    movq %r12, %rdi
+    callq vmx_external_irqs_entry_helper
+
     movq %r12, %rdi
     callq get_vcpu_launch_state
     movq %rax, %r10
 
     cmp $VMCS_LS_INVALID_VAL, %r10
     jne 1f
-    movq $VMX_INVALID_VCPU_LS, %rax
-    leave
-    retq
+
+    movq $VMX_INVALID_LAUNCH_STATE, %rax
+    jmp .Lout
 1:
     cmp $VMCS_LS_CLEAR_VAL, %r10
     je .Lvmlaunch_op
@@ -159,17 +155,26 @@ asm_vmx_vm_entry_handler:
     load_guest_regs r8
 
     vmresume
-
     movq $VMX_VMRESUME_FAILED, %rax
-    leave
-    retq
+    jmp .Lout
 .Lvmlaunch_op:
     movq %r13, %r8
     load_guest_regs r8
 
     vmlaunch
-
     movq $VMX_VMLAUNCH_FAILED, %rax
+    jmp .Lout
+
+.Lout:
+    # We need to get the vCPU ptr from the stack and re-set the BSP since a
+    # vmresume/vmlaunch attempt might already have cleared those values
+    movq %rsp, %rbp
+    addq $0x10, %rbp
+    movq +0x08(%rsp), %rdi
+
+    pushq %rax
+    callq vmx_entry_failure_cleanup
+    popq %rax
     leave
     retq
 

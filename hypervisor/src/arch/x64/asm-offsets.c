@@ -1,5 +1,5 @@
 #include "stddef.h"
-#include "asm/vm.h"
+#include "vm.h"
 #include "asm/vcpu_guest_reg_state.h"
 
 #define DEFINE_ASM_OFFSET(sym, offset)  \
@@ -7,6 +7,13 @@
 
 #define OFFSET(name, _struct, member)   \
     DEFINE_ASM_OFFSET(name, offsetof(_struct, member))
+
+void
+__dummy_vcpu_members_offset(void)
+{
+    OFFSET(VCPU_ARCH_VCPU_OFFSET, struct vcpu, arch);
+    OFFSET(VCPU_VMX_LS_OFFSET, struct vcpu, arch.hw.vmx.launch_state);
+}
 
 void
 __dummy_vcpu_user_regs_offsets(void)
@@ -29,15 +36,5 @@ __dummy_vcpu_user_regs_offsets(void)
     OFFSET(USREG_RIP, struct vcpu_user_regs, rip);
     OFFSET(USREG_RSP, struct vcpu_user_regs, rsp);
     OFFSET(USREG_RFLAGS, struct vcpu_user_regs, rflags);
-}
-
-void
-__dummy_arch_vcpu_members_offset(void)
-{
-    OFFSET(AVCPU_USR_STATE, struct arch_vcpu, state);
-
-    OFFSET(AVCPU_HW, struct arch_vcpu, hw);
-    OFFSET(AVCPU_HW_VMX_LAUNCH_STATE, struct vmx_vcpu_state, launch_state);
-    OFFSET(AVCPU_HW_VMX_ACTIVE_CPU, struct vmx_vcpu_state, active_cpu);
 }
 

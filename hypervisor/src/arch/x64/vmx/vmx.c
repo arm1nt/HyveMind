@@ -809,7 +809,21 @@ __vmx_entry_helper(vcpu_t *vcpu)
     ret |= vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
     ret |= vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
 
+    disable_local_interrupts();
+    spinlock_acquire(&vcpu->lock);
+    vcpu->state = VCPU_RUNNING;
+    spinlock_release(&vcpu->lock);
+
     return ret;
+}
+
+void
+vmx_entry_failure_cleanup(vcpu_t *vcpu)
+{
+    uint64_t flags;
+    spinlock_acquire_irq_save(&vcpu->lock, flags);
+    vcpu->state = VCPU_NOT_RUNNING;
+    spinlock_release_irq_restore(&vcpu->lock, flags);
 }
 
 void
@@ -861,6 +875,11 @@ vmx_vm_exit_handler(vcpu_t *vcpu)
     vmcs_exit_reason_t exit_reason;
     const struct x86_emulate_ops *emu_ops = &vcpu->vm->arch_vm.vmx.ops;
     struct vcpu_user_regs *regs = &vcpu->arch.state.user_regs;
+
+    spinlock_acquire(&vcpu->lock);
+    vcpu_vmx(vcpu).launch_state = VMCS_LS_LAUNCHED;
+    vcpu->state = VCPU_NOT_RUNNING;
+    spinlock_release(&vcpu->lock);
 
     vmread(GUEST_RIP, &regs->rip);
     vmread(GUEST_RSP, &regs->rsp);

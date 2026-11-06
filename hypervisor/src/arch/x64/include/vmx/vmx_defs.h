@@ -39,6 +39,7 @@
 #define VMX_VMLAUNCH_FAILED         32
 #define VMX_VMRESUME_FAILED         33
 #define VMX_VM_ENTRY_ERROR          34
+#define VMX_ERROR                   35
 
 #endif /* _HYVEMIND_X64_VMX_VMX_DEFS_H */
 
