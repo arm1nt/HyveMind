@@ -7,8 +7,7 @@ static void
 launch_vcpu(struct sched_unit *vcpu_sched_unit)
 {
     vcpu_t *vcpu = (vcpu_t *) container_of(vcpu_sched_unit, struct vcpu, sched_unit);
-
-    NOT_YET_IMPLEMENTED;
+    arch_launch_vcpu(vcpu);
 }
 
 static inline int
@@ -30,6 +29,7 @@ allocate_vcpu(void)
     vcpu->state = VCPU_CREATED;
     spinlock_init(&vcpu->lock);
     INIT_LIST_HEAD(&vcpu->sched_unit.sched_queue);
+    vcpu->sched_unit.state = TASK_RUNNABLE;
     vcpu->sched_unit.ops.launch_task = launch_vcpu;
 
    if (arch_alloc_vcpu(vcpu) != 0) {

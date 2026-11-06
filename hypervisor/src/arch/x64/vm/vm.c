@@ -119,14 +119,14 @@ prepare_vm_env_devices(struct vm *vm, const struct vm_config *config)
 {
     /* Per-default, we don't expose any host IRQ lines to the VM */
     for (int i = 0; i < 256; i++) {
-        vm->arch_vm.devices.host_to_guest_irq[i] = -1;
-        vm->arch_vm.devices.guest_to_host_irq[i] = -1;
+        vm_devices(vm).host_to_guest_irq[i] = VM_IRQ_LINE_UNMAPPED;
+        vm_devices(vm).guest_to_host_irq[i] = VM_IRQ_LINE_UNMAPPED;
     }
 
     /* Every IO port access should cause a VM-exit */
     virt_addr_t io_bitmap;
     if (get_pages_zeroed(VMCS_IO_BITMAP_PAGES, &io_bitmap) != 0) {
-        pr_error("Error allocating IO bitmaps for VM %s", config->name);
+        pr_error("Error allocating IO bitmaps for VM %s", vm->name);
         return -ERR_NO_MEM;
     }
     memset((uint8_t *) io_bitmap, 0xFF, PAGE_SIZE * VMCS_IO_BITMAP_PAGES);
@@ -298,7 +298,6 @@ configure_base_virt_policy(struct vmx_virt_policy *policy)
     policy->exit_ctls1.host_addr_space_size = 1;
     policy->exit_ctls1.load_ia32_efer = 1;
     policy->exit_ctls1.save_ia32_efer = 1;
-    policy->exit_ctls1.ack_interrupt_on_exit = 1;
 
     policy->entry_ctls.load_ia32_efer = 1;
 }
@@ -351,10 +350,22 @@ arch_prepare_execution_env(struct vm *vm, const struct vm_config *config)
     /**
      * At this point, the execution environment of the VM is completely set up
      * and all vCPUs (and their VMCS) are properly configured and are schedulable.
-     * -> Todo:
-     *      Vmclear each vCPU and set their status to schedulable
      */
+    for (int i = 0; i < vm->nr_vcpus; i++) {
+        vmx_clear_vcpu(vm->vcpus[i]);
+        vm->vcpus[i]->state = VCPU_READY;
+    }
 
-    NOT_YET_IMPLEMENTED;
+    return 0;
+}
+
+void
+arch_launch_vcpu(vcpu_t *vcpu)
+{
+    const int ret = vmx_execute_vcpu(vcpu, &vcpu->arch.state.user_regs);
+    if (ret != VMX_SUCCESS) {
+        pr_error("vCPU execution ended with error: %lu", ret);
+        set_task_state(TASK_KILLED);
+    }
 }
 

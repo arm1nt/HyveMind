@@ -51,10 +51,13 @@ struct arch_vcpu {
     } hw;
 };
 
+#define vm_devices(x)           ((x)->arch_vm.devices)
 #define vm_vmx_state(x)         ((x)->arch_vm.vmx)
 #define vm_io_bitmap_addr(x)    (vm_vmx_state(x).io_bitmap_addr)
 #define vm_msr_bitmap_addr(x)   (vm_vmx_state(x).msr_bitmap_addr)
 #define vm_apic_access_page(x)  (vm_vmx_state(x).apic_access_page)
+
+#define VM_IRQ_LINE_UNMAPPED -1
 
 struct arch_vm {
     struct vpic *vpic;
@@ -80,7 +83,7 @@ int arch_prepare_execution_env(struct vm *vm, const struct vm_config *config);
 void arch_destroy_vcpu(struct vcpu *vcpu);
 void arch_destroy_vm(struct vm *vm);
 
-int arch_launch_vcpu(struct vcpu *vcpu);
+void arch_launch_vcpu(struct vcpu *vcpu);
 
 #endif /* _HYVEMIND_X64_ASM_VM_H */
 

@@ -35,8 +35,60 @@ do_idle(struct sched_unit *schedu)
 }
 
 static struct sched_unit idle_task = {
+    .state = TASK_RUNNABLE,
     .ops.launch_task = do_idle
 };
+
+/**
+ * At the moment, every task is fixed to run on one specific cpu and the task state
+ * can only be modified on that cpu, so we don't need synchronization here.
+ */
+void
+set_task_state(const enum task_sched_state state)
+{
+    current_tq->current->state = state;
+}
+
+static inline void
+tq_submit_blocked_task(struct task_queue *tq, struct sched_unit *schedu)
+{
+    uint64_t flags;
+    spinlock_acquire_irq_save(&tq->lock, flags);
+    list_add_tail(&tq->blocked_tasks, &schedu->sched_queue);
+    spinlock_release_irq_restore(&tq->lock, flags);
+}
+
+static inline void
+tq_submit_runnable_task(struct task_queue *tq, struct sched_unit *schedu)
+{
+    uint64_t flags;
+    spinlock_acquire_irq_save(&tq->lock, flags);
+    list_add_tail(&tq->runnable_tasks, &schedu->sched_queue);
+    spinlock_release_irq_restore(&tq->lock, flags);
+}
+
+static inline void
+tq_submit_task(struct task_queue *tq, struct sched_unit *schedu)
+{
+    switch (schedu->state) {
+        case TASK_RUNNING:
+        case TASK_RUNNABLE:
+            tq_submit_runnable_task(tq, schedu);
+            break;
+        case TASK_BLOCKED:
+            tq_submit_blocked_task(tq, schedu);
+            break;
+        case TASK_NOT_SCHEDULABLE:
+        case TASK_KILLED:
+            /* do not add task to any queue */
+    }
+}
+
+static inline void
+tq_re_enqueue_task(struct task_queue *tq, struct sched_unit *schedu)
+{
+    tq_submit_task(tq, schedu);
+}
 
 static inline struct sched_unit *
 tq_get_next_task(struct task_queue *tq)
@@ -65,8 +117,10 @@ __schedule(void)
         current_cpu->state = CPU_IDLE;
         task = &idle_task;
     }
-
     spinlock_release(&current_cpu->lock);
+
+    current_tq->current = task;
+    set_task_state(TASK_RUNNING);
     /* Launches with interrupts disabled */
     task->ops.launch_task(task);
 
@@ -74,6 +128,8 @@ __schedule(void)
     spinlock_acquire(&current_cpu->lock);
     current_cpu->state = CPU_INIT;
     spinlock_release(&current_cpu->lock);
+
+    tq_re_enqueue_task(current_tq, task);
     enable_local_interrupts();
 }
 
@@ -102,15 +158,6 @@ enter_schedule_loop(void)
 {
     /* Todo: Allocate a clean scheduler stack and switch to it */
     schedule_loop();
-}
-
-static inline void
-tq_submit_runnable_task(struct task_queue *tq, struct sched_unit *schedu)
-{
-    uint64_t flags;
-    spinlock_acquire_irq_save(&tq->lock, flags);
-    list_add_tail(&tq->runnable_tasks, &schedu->sched_queue);
-    spinlock_release_irq_restore(&tq->lock, flags);
 }
 
 /**
@@ -146,7 +193,7 @@ sched_submit_vm(struct vm *vm)
         target_cpu = percpu_ptr_raw(cpu, cpuid);
 
         struct task_queue *tq = percpu_ptr_raw(task_queue, cpuid);
-        tq_submit_runnable_task(tq, &vm->vcpus[vcpu_idx]->sched_unit);
+        tq_submit_task(tq, &vm->vcpus[vcpu_idx]->sched_unit);
 
         spinlock_acquire_irq_save(&target_cpu->lock, flags);
         if (target_cpu->state == CPU_IDLE)
