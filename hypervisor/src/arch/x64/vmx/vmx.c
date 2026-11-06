@@ -64,7 +64,7 @@ static int
 vmx_load_vcpu(vcpu_t *vcpu)
 {
     const int res = vmptrld(vcpu_vmx(vcpu).vmcs_ptr);
-    if (res != VMX_OP_SUCCESS) {
+    if (res != VMX_SUCCESS) {
         pr_warn("Failed to load vCPU");
         return res;
     }
@@ -127,7 +127,7 @@ vmx_vcpu_allocate(vcpu_t *vcpu)
     }
 
     res = vmclear(vmcs_ptr);
-    if (res != VMX_OP_SUCCESS) {
+    if (res != VMX_SUCCESS) {
         pr_error("'vmclear' on new VMCS area failed: %lu", U64(res));
         free_page_raw(vmcs_ptr);
         return -1;
@@ -229,7 +229,7 @@ enter_vmx_operation(void)
     sanitize_ctrl_regs_for_vmxon();
 
     res = vmxon(vmxon_region);
-    if (res != VMX_OP_SUCCESS) {
+    if (res != VMX_SUCCESS) {
         pr_error("Executing 'vmxon' failed with error status: %lu", U64(res));
         free_page_raw(vmxon_region);
         return false;
@@ -297,7 +297,7 @@ setup_host_segment_registers(void)
     vmwrite(HOST_GS_SELECTOR, 0);
 }
 
-extern void asm_vmx_vm_exit_handler(struct vcpu_user_regs *regs);
+extern void asm_vmx_vm_exit_handler(void);
 
 static int
 setup_exit_handler(void)
@@ -409,7 +409,7 @@ vmx_set_guest_efer(vcpu_t *vcpu, const ia32_efer_t efer)
 }
 
 void
-vmx_get_default_cr4_mask_and_shadow(uint64_t *default_mask, uint64_t *default_shadow)
+vmx_get_default_cr4_mask_and_shadow(uint64_t *mask, uint64_t *shadow)
 {
     /**
      * The mask sets all bits that are fixed by vmx-operation as host owned.
@@ -418,8 +418,8 @@ vmx_get_default_cr4_mask_and_shadow(uint64_t *default_mask, uint64_t *default_sh
     const uint64_t vmx_flexible_cr4_bits = VMX_CR4_FIXED0 ^ VMX_CR4_FIXED1;
     const uint64_t vmx_fixed_cr4_bits = ~vmx_flexible_cr4_bits;
 
-    *default_mask = vmx_fixed_cr4_bits;
-    *default_shadow = VMX_CR4_FIXED0 & VMX_CR4_FIXED1;
+    *mask = vmx_fixed_cr4_bits;
+    *shadow = VMX_CR4_FIXED0 & VMX_CR4_FIXED1;
 }
 
 void
@@ -431,11 +431,8 @@ vmx_set_cr4_mask_and_shadow(vcpu_t *vcpu, const uint64_t mask, const uint64_t sh
 }
 
 int
-vmx_set_system_table(
-        vcpu_t *vcpu,
-        const enum x86_sys_table type,
-        struct vcpu_sys_table table
-) {
+vmx_set_system_table(vcpu_t *vcpu, const enum x86_sys_table type, struct vcpu_sys_table table)
+{
     table.limit &= 0xFFF;
     vmx_make_vcpu_current(vcpu);
 
@@ -443,17 +440,13 @@ vmx_set_system_table(
         case X86_GDT:
             vmwrite(GUEST_GDTR_BASE, table.base);
             vmwrite(GUEST_GDTR_LIMIT, table.limit);
-            goto success_out;
+            break;
         case X86_IDT:
             vmwrite(GUEST_IDTR_BASE, table.base);
             vmwrite(GUEST_IDTR_LIMIT, table.limit);
-            goto success_out;
-        default:
-            pr_error("Unknown sys table type");
-            return -1;
+            break;
     }
 
-success_out:
     return 0;
 }
 
@@ -678,7 +671,7 @@ vmx_initialize_vmcs_area(vcpu_t *vcpu)
     struct vmx_virt_policy *policy;
     cr4_t cr4_mask, cr4_shadow;
 
-    if ((ret = vmx_make_vcpu_current(vcpu)) != VMX_OP_SUCCESS) {
+    if ((ret = vmx_make_vcpu_current(vcpu)) != VMX_SUCCESS) {
         pr_error("Error making vcpu current to initialize VMCS: %lu", U64(ret));
         return -1;
     }
@@ -771,72 +764,126 @@ vmx_inject_exception(vcpu_t *vcpu, const int vector, const int error_code)
     vmwrite(INJECTED_EVENT_IDENTIFICATION, event_id.raw);
 }
 
-/* in vmx/entry.S */
-extern int asm_do_vmx_vcpu_entry(
-        const vcpu_t *vcpu,
-        const enum vmcs_launch_state launch_state,
-        const struct vcpu_user_regs *regs
-);
-
-bool
-__vmx_entry_helper(vcpu_t *vcpu)
+static void
+vmx_inject_ext_intr(const uint8_t vector)
 {
-    int ret = VMX_OP_SUCCESS;
-    ret |= vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
-    ret |= vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
-    ret |= vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
-    return ret == VMX_OP_SUCCESS;
+    vmcs_event_inject_t event;
+    event.raw = 0;
+
+    event.vector = vector;
+    event.type = INJECT_EVENT_TYPE_EXT_INTERRUPT;
+    event.valid = 1;
+    vmwrite(INJECTED_EVENT_IDENTIFICATION, U64(event.raw));
 }
 
-int
-vmx_enter_vcpu(vcpu_t *vcpu)
+static void
+vmx_set_intr_window_exiting_ctrl(const int val)
 {
-    int ret;
-    enum vmcs_launch_state launch_state = vcpu_vmx(vcpu).launch_state;
-
-    if ((ret = vmx_make_vcpu_current(vcpu)) != 0) {
-        pr_error("vCPU entry failed due to error making the vcpu current: %s",
-                stringify_vmx_op_status(ret)
-        );
-        return -1;
+    uint64_t raw_ctrl;
+    vmcs_procbased_ctls1 ctls;
+    if (vmread(PRIMARY_PROC_BASED_VM_EXEC_CONTROLS, &raw_ctrl) != 0) {
+        die_reason("reading proc based ctls1 for intr window failed");
     }
-
-    if (launch_state == VMCS_LS_INVALID) {
-        pr_error("vCPU launch state is invalid (neither 'clear' or 'launched')");
-        return -1;
-    }
-
-    ret = asm_do_vmx_vcpu_entry(vcpu, launch_state, &vcpu->arch.state.user_regs);
-    pr_error("vmx entry op unsucessful: %s", stringify_vmx_op_status(ret));
-    dump_vmcs();
-    die_reason("blocker for now");
+    ctls.raw = U64_LOWER32(raw_ctrl);
+    ctls.interrupt_window_exiting = val;
+    vmwrite(PRIMARY_PROC_BASED_VM_EXEC_CONTROLS, U64(ctls.raw));
 }
 
 void
-vmx_vm_exit_handler(struct vcpu_user_regs *regs)
+vmx_set_exit_handler_rsp(const virt_addr_t exit_handler_rsp)
+{
+    vmwrite(HOST_RSP, exit_handler_rsp);
+}
+
+int
+vmx_prepare_vcpu_execution(vcpu_t *vcpu)
+{
+    return vmx_make_vcpu_current(vcpu);
+}
+
+int
+__vmx_entry_helper(vcpu_t *vcpu)
+{
+    int ret = VMX_SUCCESS;
+    ret |= vmwrite(GUEST_RIP, vcpu->arch.state.user_regs.rip);
+    ret |= vmwrite(GUEST_RSP, vcpu->arch.state.user_regs.rsp);
+    ret |= vmwrite(GUEST_RFLAGS, vcpu->arch.state.user_regs.rflags);
+
+    return ret;
+}
+
+void
+vmx_external_irqs_entry_helper(vcpu_t *vcpu)
+{
+    /* Todo: refactor */
+    if (!vcpu_has_external_irq(vcpu))
+        return;
+
+    if (!vpic_has_pending_irq(vm_vpic(vcpu->vm)))
+        return;
+
+    bool interruptible = true;
+
+    rflags_t rflags;
+    rflags.raw = vcpu->arch.state.user_regs.rflags;
+    if (rflags.intrf == 0)
+        interruptible = false;
+
+    uint64_t act_state = 0;
+    vmread(GUEST_ACTIVITY_STATE, &act_state);
+    if (act_state)
+        interruptible = false;
+
+    uint64_t intr_state = 0;
+    vmread(GUEST_INTERRUPTIBILITY_STATE, &intr_state);
+    if (U64_LOWER32(intr_state) != 0)
+        interruptible = false;
+
+    if (!interruptible) {
+        vmx_set_intr_window_exiting_ctrl(1);
+    } else {
+        const int irq = vcpu_get_external_irq(vcpu);
+        vmx_inject_ext_intr(irq);
+    }
+}
+
+static inline void
+dump_vcpu_state(vcpu_t *vcpu)
+{
+    // Todo: dump vpic and vlapic state as well
+    dump_vmcs();
+}
+
+int
+vmx_vm_exit_handler(vcpu_t *vcpu)
 {
     uint64_t exit_reason_raw, exit_qualification_raw;
     vmcs_exit_reason_t exit_reason;
-    vcpu_t *vcpu = current_vcpu;
     const struct x86_emulate_ops *emu_ops = &vcpu->vm->arch_vm.vmx.ops;
-
-    current_vcpu->arch.hw.vmx.launch_state = VMCS_LS_LAUNCHED;
+    struct vcpu_user_regs *regs = &vcpu->arch.state.user_regs;
 
     vmread(GUEST_RIP, &regs->rip);
     vmread(GUEST_RSP, &regs->rsp);
     vmread(GUEST_RFLAGS, &regs->rflags);
 
+    vmread(EXIT_QUALIFICATION, &exit_qualification_raw);
     vmread(EXIT_REASON, &exit_reason_raw);
     exit_reason.raw = exit_reason_raw;
-    vmread(EXIT_QUALIFICATION, &exit_qualification_raw);
 
     if (exit_reason.vm_entry_failure) {
-        pr_error("VM-entry failed");
-        dump_vmcs();
-        die();
+        pr_error("VM-entry failed for vCPU of VM %s", vcpu->vm->name);
+        dump_vcpu_state(vcpu);
+        return VMX_VM_ENTRY_ERROR;
     }
 
+    enable_local_interrupts();
+
     switch (exit_reason.basic_exit_reason) {
+        case EXIT_REASON_EXT_INTR:
+            break;
+        case EXIT_REASON_INTR_WINDOW:
+            vmx_set_intr_window_exiting_ctrl(0);
+            break;
         case EXIT_REASON_CPUID:
             emu_ops->emulate_cpuid(vcpu, regs);
             break;
@@ -856,32 +903,14 @@ vmx_vm_exit_handler(struct vcpu_user_regs *regs)
         case EXIT_REASON_XSETBV:
             emu_ops->emulate_xsetbv(vcpu, regs);
             break;
-        case EXIT_REASON_EXCEPTION:
-            dump_vmcs();
-            die();
-            NOT_YET_IMPLEMENTED;
-        case EXIT_REASON_TRP_BELOW_THRESHOLD:
-            dump_vmcs();
-            die();
-            NOT_YET_IMPLEMENTED;
-        case EXIT_REASON_APIC_ACCESS:
-            pr_error("APIC ACCESS ERROR REASON");
-            dump_vmcs();
-            die();
         case EXIT_REASON_APIC_WRITE:
             guest_apic_register_write(vcpu, exit_qualification_raw);
             break;
         default:
-            dump_vmcs();
-            die();
+            dump_vcpu_state(vcpu);
+            NOT_YET_IMPLEMENTED;
     }
 
-    vmx_enter_vcpu(vcpu);
-}
-
-vmx_op_status_t
-eflags_to_vmx_op_status(const uint32_t flags)
-{
-    return __check_vm_op_status(flags);
+    return VMX_SUCCESS;
 }
 
