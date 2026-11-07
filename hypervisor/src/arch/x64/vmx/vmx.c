@@ -10,9 +10,9 @@
 #include "asm/paging.h"
 #include "asm/processor.h"
 #include "asm/vmm.h"
+#include "vm/io.h"
 #include "vmx/emulate.h"
 #include "vmx/policy.h"
-#include "vmx/io.h"
 #include "vmx/vmx.h"
 #include "vmx/vmcs.h"
 #include "vmx/vmx_ops.h"
@@ -868,6 +868,36 @@ dump_vcpu_state(vcpu_t *vcpu)
     dump_vmcs();
 }
 
+static struct pio_operation
+vmx_exit_qual_to_pio_op(const uint64_t io_exit_qual_raw)
+{
+    struct pio_operation pio;
+    vmcs_io_exit_qualification_t io_info;
+    io_info.raw = io_exit_qual_raw;
+
+    switch (io_info.direction) {
+        case IO_QUAL_READ:
+            pio.direction = PIO_OP_READ;
+            break;
+        case IO_QUAL_WRITE:
+            pio.direction = PIO_OP_WRITE;
+    }
+
+    switch (io_info.access_size) {
+        case IO_QUAL_SIZE_BYTE:
+            pio.size = PIO_OP_SIZE_BYTE;
+            break;
+        case IO_QUAL_SIZE_WORD:
+            pio.size = PIO_OP_SIZE_WORD;
+            break;
+        case IO_QUAL_SIZE_DWORD:
+            pio.size = PIO_OP_SIZE_DWORD;
+    }
+
+    pio.port = io_info.port;
+    return pio;
+}
+
 int
 vmx_vm_exit_handler(vcpu_t *vcpu)
 {
@@ -907,7 +937,8 @@ vmx_vm_exit_handler(vcpu_t *vcpu)
             emu_ops->emulate_cpuid(vcpu, regs);
             break;
         case EXIT_REASON_IO_INSTRUCTION:
-            guest_io_instruction(vcpu, regs, exit_qualification_raw);
+            struct pio_operation pio = vmx_exit_qual_to_pio_op(exit_qualification_raw);
+            handle_guest_io_op(&pio, vcpu);
             step_guest_rip(regs);
             break;
         case EXIT_REASON_RDMSR_IMPLICIT:
