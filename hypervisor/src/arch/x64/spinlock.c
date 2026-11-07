@@ -19,20 +19,10 @@ atomic_acquire(volatile uint8_t *flag)
 static inline void
 atomic_release(volatile uint8_t *flag)
 {
-    uint8_t release = SPINLOCK_FREE;
-
+    const uint8_t release = SPINLOCK_FREE;
     /* Since we use lock semantics this is instruction is serializing */
-    asm volatile(
-            "lock xchg %1, %0"
-            :  "+m"(*flag)
-            : "r"(release)
-    );
+    asm volatile("lock xchg %1, %0" : "+m"(*flag) : "r"(release));
 }
-
-/**
- * TODO: Add debug check that requestor processor is allowed to release the
- * lock (i.e. currently owns it)
- */
 
 void
 arch_spinlock_acquire(spinlock_t *lock)
