@@ -177,7 +177,8 @@ handle_ocw3_write(struct __vpic *vpic, const uint8_t ocw3)
 void
 vpic_write(struct __vpic *vpic, const uint16_t port, const uint8_t val)
 {
-    spinlock_acquire(vpic->lock);
+    uint64_t flags;
+    spinlock_acquire_irq_save(vpic->lock, flags);
 
     if (IS_ICW1(port, val)) {
         start_init_sequence(vpic, val);
@@ -201,13 +202,14 @@ vpic_write(struct __vpic *vpic, const uint16_t port, const uint8_t val)
         die_reason("Unreachable");
     }
 out:
-    spinlock_release(vpic->lock);
+    spinlock_release_irq_restore(vpic->lock, flags);
 }
 
 void
 vpic_read(struct __vpic *vpic, const uint16_t port, uint8_t *val)
 {
-    spinlock_acquire(vpic->lock);
+    uint64_t flags;
+    spinlock_acquire_irq_save(vpic->lock, flags);
 
     if (A0_CLEAR(port)) {
         if (vpic->read_mode == VPIC_READ_IRR) {
@@ -219,7 +221,7 @@ vpic_read(struct __vpic *vpic, const uint16_t port, uint8_t *val)
         *val = vpic->imr;
     }
 
-    spinlock_release(vpic->lock);
+    spinlock_release_irq_restore(vpic->lock, flags);
 }
 
 static inline struct vcpu *
