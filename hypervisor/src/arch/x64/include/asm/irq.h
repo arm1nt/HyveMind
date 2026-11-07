@@ -25,9 +25,11 @@ struct irq_domain {
     void (*mask_irq_line)(const hwirq_t device_irq);
 };
 
+struct irq_desc;
+
 struct irq_handler {
     void *data;
-    int (*handler)(irq_t irq_vector, void *data);
+    int (*handler)(struct irq_desc *desc, void *data);
 };
 
 struct irq_desc {

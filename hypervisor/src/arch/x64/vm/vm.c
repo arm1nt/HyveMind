@@ -4,6 +4,7 @@
 #include "vm.h"
 #include "asm/arch_types.h"
 #include "asm/apic_defs.h"
+#include "asm/irq.h"
 #include "loader/loader.h"
 #include "vmx/ept.h"
 #include "vmx/policy.h"
@@ -26,6 +27,12 @@ arch_destroy_vcpu(struct vcpu *vcpu)
 
     if (vcpu_virt_policy(vcpu))
         hfree(vcpu_virt_policy(vcpu));
+}
+
+void
+arch_destroy_vm(struct vm *vm)
+{
+    NOT_YET_IMPLEMENTED;
 }
 
 int
@@ -117,12 +124,6 @@ virtualize_guest_physical_mem(struct vm *vm, const struct vm_config *config)
 static int
 prepare_vm_env_devices(struct vm *vm, const struct vm_config *config)
 {
-    /* Per-default, we don't expose any host IRQ lines to the VM */
-    for (int i = 0; i < 256; i++) {
-        vm_devices(vm).host_to_guest_irq[i] = VM_IRQ_LINE_UNMAPPED;
-        vm_devices(vm).guest_to_host_irq[i] = VM_IRQ_LINE_UNMAPPED;
-    }
-
     /* Every IO port access should cause a VM-exit */
     virt_addr_t io_bitmap;
     if (get_pages_zeroed(VMCS_IO_BITMAP_PAGES, &io_bitmap) != 0) {
@@ -139,11 +140,57 @@ prepare_vm_env_devices(struct vm *vm, const struct vm_config *config)
         return -1;
     }
 
+    /* Per-default, we don't expose any host IRQ lines to the VM */
+    for (int i = 0; i < NR_IRQS; i++) {
+        vm_devices(vm).host_to_guest_irq[i] = VM_IRQ_LINE_UNMAPPED;
+        vm_devices(vm).guest_to_host_irq[i] = VM_IRQ_LINE_UNMAPPED;
+    }
+
+    /**
+     * Todo: Allocate vPIT
+     * --- temporary way to pass through the pit to let a guest launch
+     * --- Todo: remove
+     */
+    const hwirq_t pit_irq_line = 0x00;
+    vm_devices(vm).host_to_guest_irq[pit_irq_line] = pit_irq_line;
+    vm_devices(vm).guest_to_host_irq[pit_irq_line] = pit_irq_line;
+    /* --- Remove end */
+
     const struct guest_uart_info vm_uart = config->devices.uart_info;
     if (vm_uart.configured) {
-        vm->arch_vm.devices.host_serial_pio_base = vm_uart.host_base_port;
-        vm->arch_vm.devices.host_to_guest_irq[vm_uart.host_irq] = vm_uart.vm_irq;
-        vm->arch_vm.devices.guest_to_host_irq[vm_uart.vm_irq] = vm_uart.host_irq;
+        vm_devices(vm).host_serial_pio_base = vm_uart.host_base_port;
+        vm_devices(vm).host_to_guest_irq[vm_uart.host_irq] = vm_uart.vm_irq;
+        vm_devices(vm).guest_to_host_irq[vm_uart.vm_irq] = vm_uart.host_irq;
+    }
+
+    for (int vm_irq = 0; vm_irq < NR_IRQS; vm_irq++) {
+        const int mapped_host_irq = vm_devices(vm).guest_to_host_irq[vm_irq];
+        if (mapped_host_irq == VM_IRQ_LINE_UNMAPPED)
+            continue;
+
+        struct irq_handler *handler = (struct irq_handler *) hmalloc(sizeof(struct irq_handler));
+        if (!handler) {
+            pr_error("Failed to allocate IRQ handler for guest IRQ %lu "
+                    "mapping to host IRQ %lu",
+                    vm_irq,
+                    mapped_host_irq
+            );
+            /* Todo: Free everything previously allocated (vpic, handlers, etc.) */
+            NOT_YET_IMPLEMENTED;
+        }
+
+        handler->data = (void *) vm;
+        handler->handler = vm_external_irq_handler;
+
+        if (request_irq(IRQ_DOMAIN_PIC, mapped_host_irq, handler) < 0) {
+            pr_error("Failed to install IRQ handler for guest IRQ %lu mapping "
+                    "to host IRQ %lu",
+                    vm_irq,
+                    mapped_host_irq
+            );
+            /* Todo: Free everything previously allocated */
+            NOT_YET_IMPLEMENTED;
+        }
     }
 
     return 0;

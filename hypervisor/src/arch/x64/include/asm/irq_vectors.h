@@ -1,6 +1,8 @@
 #ifndef _HYVEMIND_X64_ASM_IRQ_VECTORS_H
 #define _HYVEMIND_X64_ASM_IRQ_VECTORS_H
 
+#define IRQ_NR_VECTORS 256
+
 #define IRQ_DIVIDE_ERROR_VECTOR     0x00
 #define IRQ_NMI_VECTOR              0x02
 #define IRQ_UD_VECTOR               0x06
@@ -19,6 +21,8 @@
 #define IRQ_CPU_KICK_VECTOR         0xf0
 
 #define IRQ_APIC_TIMER_VECTOR       0x30
+
+#define NR_IRQS 16
 
 #endif /*  _HYVEMIND_X64_ASM_IRQ_VECTORS_H */
 

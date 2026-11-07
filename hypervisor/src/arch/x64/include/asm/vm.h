@@ -57,8 +57,6 @@ struct arch_vcpu {
 #define vm_msr_bitmap_addr(x)   (vm_vmx_state(x).msr_bitmap_addr)
 #define vm_apic_access_page(x)  (vm_vmx_state(x).apic_access_page)
 
-#define VM_IRQ_LINE_UNMAPPED -1
-
 struct arch_vm {
     struct vpic *vpic;
 

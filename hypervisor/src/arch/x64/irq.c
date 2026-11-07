@@ -8,13 +8,12 @@
 #include "asm/irq_vectors.h"
 #include "asm/idt.h"
 
-#define NR_IRQ_VECTORS 256
 /**
  * Since atm we only use the PIC for external interrupts, all IRQs will be
  * handled by the bsp, so a single table suffices
  */
-static struct irq_desc irq_desc_table[NR_IRQ_VECTORS] = {
-    [0 ... NR_IRQ_VECTORS-1] = {
+static struct irq_desc irq_desc_table[IRQ_NR_VECTORS] = {
+    [0 ... IRQ_NR_VECTORS-1] = {
         .used = false,
         .lock = DECLARE_SPINLOCK_RAW(),
     }
@@ -28,11 +27,11 @@ execute_irq_handler_chain(struct irq_desc *desc)
     if (!desc->handler_chain)
         return;
 
-    desc->handler_chain->handler(desc->irq_vector, desc->handler_chain->data);
+    desc->handler_chain->handler(desc, desc->handler_chain->data);
 }
 
 /* irq_desc lock must be held before calling this function */
-static inline void
+static void __attribute__((noinline))
 __common_legacy_irq_trampoline(struct irq_desc *desc)
 {
     if (desc->used) {
@@ -77,7 +76,12 @@ request_legacy_irq(struct irq_handler *handler, const hwirq_t device_irq)
     uint64_t flags;
 
     if (device_irq >= IRQ_LEGACY_VECTOR_NR) {
-        pr_error("Invalid legacy IRQ line '%lu' requested!", device_irq);
+        pr_error("Invalid PIC IRQ '%lu' requested!", device_irq);
+        return -ERR_INVAL;
+    }
+
+    if (device_irq == 0x02) {
+        pr_error("Cannot install a handler on the child PIC IRQ input");
         return -ERR_INVAL;
     }
 
@@ -85,7 +89,7 @@ request_legacy_irq(struct irq_handler *handler, const hwirq_t device_irq)
     struct irq_desc *desc = &irq_desc_table[irq_vec];
     spinlock_acquire_irq_save(&desc->lock, flags);
 
-    if (desc->used || device_irq == 2) {
+    if (desc->used) {
         /* For now, we only allow a single handler to be installed for a device_irq. */
         pr_error("IRQ line %lu (at irq vec %lu) is already occupied!", device_irq, irq_vec);
         spinlock_release_irq_restore(&desc->lock, flags);
@@ -104,8 +108,11 @@ request_legacy_irq(struct irq_handler *handler, const hwirq_t device_irq)
 }
 
 int
-request_irq(const enum irq_domain_type domain, const hwirq_t device_irq, struct irq_handler* handler)
-{
+request_irq(
+        const enum irq_domain_type domain,
+        const hwirq_t device_irq,
+        struct irq_handler* handler
+) {
     switch (domain) {
         case IRQ_DOMAIN_PIC:
             return request_legacy_irq(handler, device_irq);
