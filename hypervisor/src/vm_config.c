@@ -1,16 +1,38 @@
-#include "config_private.h"
 #include "fatal.h"
 #include "types.h"
 #include "vm_config.h"
+#include "vm_config_defs.h"
+#include "vm_config_private.h"
 #include "printf.h"
 #include "string.h"
-#include "vm_config_defs.h"
 #include "lib/radix-tree.h"
 
 #define T struct vm_config
 #define PREFIX vm_config
 #define VECTOR_IMPLEMENTATION
 #include "lib/vector_template.h"
+
+struct serial_dev_info {
+    int assignee;
+    struct guest_uart_info info;
+};
+
+#define INIT_SERIAL_DEV_INFO(host_port, _host_irq, guest_irq)   \
+    {                                                           \
+        .assignee = -1,                                         \
+        {                                                       \
+            .configured = true,                                 \
+            .host_base_port = host_port,                        \
+            .host_irq = _host_irq,                              \
+            .vm_irq = guest_irq,                                \
+        }                                                       \
+    }
+
+static struct serial_dev_info serial_devices[__SERIAL_DEV_NR_IDS] = {
+    [SERIAL_DEV1] = INIT_SERIAL_DEV_INFO(0x3F8, 0x04, 0x04),
+    [SERIAL_DEV2] = INIT_SERIAL_DEV_INFO(0x2F8, 0x05, 0x04),
+    [SERIAL_DEV3] = INIT_SERIAL_DEV_INFO(0x3E8, 0x06, 0x04),
+};
 
 struct vm_request {
     /* To associate error messages with config entries */
@@ -28,6 +50,10 @@ struct vm_request {
             char *cmdline_str;
         } linux;
     } boot;
+
+    struct {
+        enum serial_device_id serial_id;
+    } devices;
 };
 
 #define T struct vm_request
@@ -84,7 +110,6 @@ get_config_key_radix(void)
     }
 
     return tree;
-
 error_out:
     destroy_radix_tree(tree);
     return NULL;
@@ -167,12 +192,24 @@ get_mem_granularity_from_string(const char *str)
     return -1;
 }
 
+static inline bool
+is_only_digits(const char *value, const char *endptr, const bool overflow)
+{
+    return !((value == endptr || *endptr != '\0') && *endptr != '-' && !overflow);
+}
+
+static inline bool
+is_positive_integer(const int value, const char *endptr, const bool overflow)
+{
+    return !(overflow || *endptr == '-' || value == 0);
+}
+
 static bool
 set_vm_request_val(struct vm_request *request, const struct config_line *entry)
 {
     bool overflow;
     char *endptr;
-    int guest_type, mem_gran;
+    int guest_type, mem_gran, serial_dev_id;
 
     switch (entry->key) {
         case CONFIG_VM_NAME_KEY:
@@ -190,38 +227,24 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
         case CONFIG_VM_VCPUS_KEY:
             request->vcpus = (unsigned int) strtoul(entry->value, &endptr, &overflow);
 
-            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-' && !overflow) {
-                log_req_error("Expected the vcpu number value to only consist of "
-                        "one or more digits. Instead, found: %s",
-                        entry->value
-                );
-                return false;
-            } else if (*endptr == '-' || overflow || request->vcpus == 0) {
-                log_req_error("Expected the vcpu number value to be an integer "
-                        "greater than 1. Instead, found: %s",
-                        entry->value
+            if (!is_only_digits(entry->value, endptr, overflow)
+                    || !is_positive_integer(request->vcpus, endptr, overflow)) {
+                log_req_error("Expected the vcpu number to be an integer greater than 1. "
+                        "Instead, found: %s", entry->value
                 );
                 return false;
             }
-
             break;
         case CONFIG_VM_MEM_SIZE_KEY:
             request->mem_size = (unsigned int) strtoul(entry->value, &endptr, &overflow);
 
-            if ((entry->value == endptr || *endptr != '\0') && *endptr != '-' && !overflow) {
-                log_req_error("Expected the mem size value to only consist of "
-                        "one or more digits. Instead, found: %s",
-                        entry->value
-                );
-                return false;
-            } else if (*endptr == '-' || overflow || request->vcpus == 0) {
-                log_req_error("Expected the mem size value to be an integer "
-                        "greater than 1. Instead, found: %s",
-                        entry->value
+            if (!is_only_digits(entry->value, endptr, overflow)
+                    || !is_positive_integer(request->mem_size, endptr, overflow)) {
+                log_req_error("Expected the mem size to be an integer greater than 1. "
+                        "Instead, found: %s", entry->value
                 );
                 return false;
             }
-
             break;
         case CONFIG_VM_MEM_GRANULARITY_KEY:
             mem_gran = get_mem_granularity_from_string(entry->value);
@@ -229,7 +252,6 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
                 log_req_error("Mem granularity value '%s' is not allowed", entry->value);
                 return false;
             }
-
             request->granularity = (enum mem_granularity) mem_gran;
             break;
         case CONFIG_VM_BOOT_LINUX_BZIMAGE_KEY:
@@ -240,6 +262,34 @@ set_vm_request_val(struct vm_request *request, const struct config_line *entry)
             break;
         case CONFIG_VM_BOOT_LINUX_CMDLINE_KEY:
             request->boot.linux.cmdline_str = strdup_nt(entry->value);
+            break;
+        case CONFIG_VM_DEV_SERIAL_KEY:
+            serial_dev_id = strtoul(entry->value, &endptr, &overflow);
+
+            if (!is_only_digits(entry->value, endptr, overflow)
+                    || !is_positive_integer(serial_dev_id, endptr, overflow)
+                    || !is_valid_serial_dev_id(serial_dev_id)) {
+                log_req_error("The serial device ID must be an integer between "
+                        "%lu and %lu. Instead, found: %s",
+                        SERIAL_DEV1,
+                        (__SERIAL_DEV_NR_IDS-1),
+                        entry->value
+                );
+                return false;
+            }
+
+            struct serial_dev_info *serial_dev = &serial_devices[serial_dev_id];
+            if (serial_dev->assignee != -1 && serial_dev->assignee != request->id) {
+                log_req_error("Serial device with ID '%lu' is already assigned in "
+                        "another VM config entry (entry id '%lu').",
+                        serial_dev_id,
+                        serial_dev->assignee
+                );
+                return false;
+            }
+
+            serial_dev->assignee = request->id;
+            request->devices.serial_id = serial_dev_id;
             break;
         case __CONFIG_OPTIONS_NR:
         case __CONFIG_INVALID_KEY:
@@ -553,6 +603,16 @@ get_linux_boot_info(
     return true;
 }
 
+static inline void
+get_serial_dev_info(struct vm_config *config, const struct vm_request *req)
+{
+    const int serial_id = req->devices.serial_id;
+    if (serial_id == INVALID_SERIAL_DEV_ID)
+        return;
+
+    config->devices.uart_info = serial_devices[serial_id].info;
+}
+
 static bool
 vm_req_to_vm_config(
         const struct limine_module_response *mods,
@@ -566,6 +626,8 @@ vm_req_to_vm_config(
     config->nr_vcpus = req->vcpus;
     config->mem_size = req->mem_size;
     config->granularity = req->granularity;
+
+    get_serial_dev_info(config, req);
 
     switch (config->type) {
         case LINUX_DIRECT_BOOT_32BIT:

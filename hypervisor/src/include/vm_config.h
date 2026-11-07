@@ -38,6 +38,13 @@ static const char *vm_type_strings[] = {
     NULL,
 };
 
+struct guest_uart_info {
+    bool configured;
+    uint16_t host_base_port;
+    uint8_t host_irq;
+    uint8_t vm_irq;
+};
+
 struct file_info {
     uintptr_t addr;
     uint64_t size;
@@ -60,6 +67,10 @@ struct vm_config {
     union {
         struct linux_boot_info linux;
     } boot_info;
+
+    struct {
+        struct guest_uart_info uart_info;
+    } devices;
 };
 
 struct vm_config_vector *get_vm_configs(const struct limine_module_response *mods);

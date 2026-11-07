@@ -22,17 +22,21 @@ const char *reserved_tokens[] = {
 #define VM_MEM_NODE         ADD_NODE(VM_NODE, mem)
 #define VM_BOOT_NODE        ADD_NODE(VM_NODE, boot)
 #define VM_LINUX_BOOT_NODE  ADD_NODE(VM_BOOT_NODE, linux)
+#define VM_DEV_NODE         ADD_NODE(VM_NODE, dev)
 
 enum config_key {
     CONFIG_VM_NAME_KEY,
     CONFIG_VM_TYPE_KEY,
     CONFIG_VM_VCPUS_KEY,
+
     CONFIG_VM_MEM_SIZE_KEY,
     CONFIG_VM_MEM_GRANULARITY_KEY,
 
     CONFIG_VM_BOOT_LINUX_BZIMAGE_KEY,
     CONFIG_VM_BOOT_LINUX_INITRAMFS_KEY,
     CONFIG_VM_BOOT_LINUX_CMDLINE_KEY,
+
+    CONFIG_VM_DEV_SERIAL_KEY,
 
     __CONFIG_OPTIONS_NR,
     __CONFIG_INVALID_KEY,
@@ -47,7 +51,22 @@ const char *config_key_strings[] = {
     [CONFIG_VM_BOOT_LINUX_BZIMAGE_KEY] = ADD_NODE(VM_LINUX_BOOT_NODE, bzimage),
     [CONFIG_VM_BOOT_LINUX_INITRAMFS_KEY] = ADD_NODE(VM_LINUX_BOOT_NODE, initramfs),
     [CONFIG_VM_BOOT_LINUX_CMDLINE_KEY] = ADD_NODE(VM_LINUX_BOOT_NODE, cmdline),
+    [CONFIG_VM_DEV_SERIAL_KEY] = ADD_NODE(VM_DEV_NODE, serial),
 };
+
+enum serial_device_id {
+    INVALID_SERIAL_DEV_ID,
+    SERIAL_DEV1,
+    SERIAL_DEV2,
+    SERIAL_DEV3,
+    __SERIAL_DEV_NR_IDS,
+};
+
+static inline bool
+is_valid_serial_dev_id(const int id)
+{
+    return SERIAL_DEV1 <= id && id <= SERIAL_DEV3;
+}
 
 static bool
 is_config_whitespace(const char c)
