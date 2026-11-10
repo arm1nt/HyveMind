@@ -73,11 +73,13 @@ u64_to_hex_string(uint64_t num, char *buf)
 int
 __printf(const char *fmt, ...)
 {
+    uint64_t flags;
+
     if (!console.initialized) {
         return -1;
     }
 
-    spinlock_acquire(&global_print_lock);
+    spinlock_acquire_irq_save(&global_print_lock, flags);
 
     char c;
     uint64_t index = 0;
@@ -132,7 +134,7 @@ __printf(const char *fmt, ...)
 
     }
 
-    spinlock_release(&global_print_lock);
+    spinlock_release_irq_restore(&global_print_lock, flags);
 
     /* TODO: return the number of characters written */
     return 0;
