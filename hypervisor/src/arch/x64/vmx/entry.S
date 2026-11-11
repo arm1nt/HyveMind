@@ -79,7 +79,7 @@
 .endm
 
 .extern vmx_prepare_vcpu_execution
-.extern vmx_set_exit_handler_rsp
+.extern vmx_update_host_state
 .extern vmx_external_irqs_entry_helper
 .extern __vmx_entry_helper
 .extern vmx_vm_exit_handler
@@ -207,7 +207,7 @@ __vmx_execute_vcpu:
     retq
 .Lvcpu_prep_success:
     movq %rsp, %rdi
-    callq vmx_set_exit_handler_rsp
+    callq vmx_update_host_state
 
     # The stack is now in the same state as it will be established by the
     # vm exit handler

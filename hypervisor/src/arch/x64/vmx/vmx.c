@@ -286,10 +286,8 @@ static inline void
 setup_host_segment_registers(void)
 {
     const segment_selector_t cs = read_segment_register(X86_CS_REG);
-    const segment_selector_t tr = read_segment_register(X86_TR_REG);
 
     vmwrite(HOST_CS_SELECTOR, *((uint16_t *) &cs));
-    vmwrite(HOST_TR_SELECTOR, *((uint16_t *) &tr));
     vmwrite(HOST_SS_SELECTOR, 0);
     vmwrite(HOST_DS_SELECTOR, 0);
     vmwrite(HOST_ES_SELECTOR, 0);
@@ -360,7 +358,6 @@ __vmx_initialize_host_state(void)
 
     vmwrite(HOST_GDTR_BASE, read_gdtr().base);
     vmwrite(HOST_IDTR_BASE, read_idtr().base);
-    vmwrite(HOST_TR_BASE, get_current_tss_base());
     vmwrite(HOST_FS_BASE, 0);
     vmwrite(HOST_GS_BASE, 0);
 
@@ -790,9 +787,13 @@ vmx_set_intr_window_exiting_ctrl(const int val)
 }
 
 void
-vmx_set_exit_handler_rsp(const virt_addr_t exit_handler_rsp)
+vmx_update_host_state(const virt_addr_t exit_handler_rsp)
 {
     vmwrite(HOST_RSP, exit_handler_rsp);
+
+    const segment_selector_t tr = read_segment_register(X86_TR_REG);
+    vmwrite(HOST_TR_SELECTOR, *((uint16_t *) &tr));
+    vmwrite(HOST_TR_BASE, get_current_tss_base());
 }
 
 int
