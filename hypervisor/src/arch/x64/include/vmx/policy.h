@@ -3,6 +3,7 @@
 
 #include "vmx/vmcs.h"
 
+#define vm_virt_policy(x)   ((x)->arch_vm.vmx.virt_policy)
 #define vcpu_virt_policy(x) ((x)->arch.hw.vmx.virt_policy)
 
 struct vmx_virt_policy {
@@ -39,7 +40,14 @@ enum vmx_policy_option {
     VMX_POLICY_VM_EXIT_CTLS2,
     VMX_POLICY_EPT,
     VMX_POLICY_MSR_BITMAP,
+    VMX_POLICY_IO_BITMAP,
     VMX_POLICY_UNRESTRICTED_GUEST,
+    VMX_POLICY_VIRTUALIZE_APIC_ACCESSES,
+    VMX_POLICY_VIRTUALIZE_X2APIC_MODE,
+    /* Virtualize either xapic or x2apic mode */
+    __VMX_POLICY_VIRTUALIZE_APIC,
+    VMX_POLICY_APIC_REGISTER_VIRTUALIZATION,
+    VMX_POLICY_VIRTUAL_INTERRUPT_DELIVERY
 };
 
 enum vmx_policy_vrfy_status {
@@ -52,20 +60,18 @@ enum vmx_policy_vrfy_status {
 };
 
 int init_vmx_capabilities(void);
-
-bool vmx_caps_is_option_supported(const enum vmx_policy_option option);
-
 void vmx_init_default_policy(struct vmx_virt_policy *policy);
 
+int validate_vmx_virt_policy(const struct vmx_virt_policy *policy);
+
+bool vmx_caps_is_option_supported(const enum vmx_policy_option option);
 bool vmx_policy_is_option_configured(
         const struct vmx_virt_policy *policy,
         const enum vmx_policy_option option
 );
 
 #define vcpu_has_option_configured(_vcpu, _option) \
-    vmx_policy_is_option_configured(_vcpu->arch.hw.vmx.virt_policy, _option)
-
-int validate_vmx_virt_policy(const struct vmx_virt_policy *policy);
+    vmx_policy_is_option_configured(vcpu_virt_policy(_vcpu), _option)
 
 #endif /* _HYVEMIND_X64_VMX_POLICY_H */
 

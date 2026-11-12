@@ -143,8 +143,8 @@ init_vmx_capabilities(void)
 {
     vmcs_pin_ctls min_pin_ctls;
     min_pin_ctls.raw = 0;
-    min_pin_ctls.external_interrupt_handling = 1;
-    min_pin_ctls.process_posted_interrupts = 1;
+    min_pin_ctls.external_interrupt_exiting = 1;
+    min_pin_ctls.nmi_exiting = 1;
 
     vmx_caps.pin_ctls = set_reserved_pinbased_ctls_default1(min_pin_ctls);
     if ((vmx_caps.pin_ctls.raw & min_pin_ctls.raw) != min_pin_ctls.raw) {
@@ -154,8 +154,10 @@ init_vmx_capabilities(void)
 
     vmcs_procbased_ctls1 min_proc_ctls1;
     min_proc_ctls1.raw = 0;
+    min_proc_ctls1.interrupt_window_exiting = 1;
     min_proc_ctls1.activate_secondary_controls = 1;
     min_proc_ctls1.msr_bitmaps = 1;
+    min_proc_ctls1.io_bitmaps = 1;
     min_proc_ctls1.tpr_shadow = 1;
 
     vmx_caps.proc_ctls1 = set_reserved_procbased_ctls1_default1(min_proc_ctls1);
@@ -243,8 +245,7 @@ init_vmx_capabilities(void)
 }
 
 /**
- * Basically a convenience function to check if a certain feature is theoretically
- * supported / enableable.
+ * Helper to check if a certain feature is theoretically supported / enableable.
  */
 bool
 vmx_caps_is_option_supported(const enum vmx_policy_option option)
@@ -261,27 +262,24 @@ vmx_caps_is_option_supported(const enum vmx_policy_option option)
                 && vmx_caps.proc_ctls2.enable_ept;
         case VMX_POLICY_MSR_BITMAP:
             return vmx_caps.proc_ctls1.msr_bitmaps;
+        case VMX_POLICY_IO_BITMAP:
+            return vmx_caps.proc_ctls1.io_bitmaps;
         case VMX_POLICY_UNRESTRICTED_GUEST:
             return vmx_caps.proc_ctls1.activate_secondary_controls
                 && vmx_caps.proc_ctls2.unrestricted_guest;
-        default:
-            return false;
+        case VMX_POLICY_VIRTUALIZE_APIC_ACCESSES:
+            return vmx_caps.proc_ctls2.virtualize_apic_accesses;
+        case VMX_POLICY_VIRTUALIZE_X2APIC_MODE:
+            return vmx_caps.proc_ctls2.virtualize_x2apic_mode;
+        case __VMX_POLICY_VIRTUALIZE_APIC:
+            return vmx_caps.proc_ctls2.virtualize_apic_accesses
+                || vmx_caps.proc_ctls2.virtualize_x2apic_mode;
+        case VMX_POLICY_APIC_REGISTER_VIRTUALIZATION:
+            return vmx_caps.proc_ctls2.apic_register_virtualization;
+        case VMX_POLICY_VIRTUAL_INTERRUPT_DELIVERY:
+            return vmx_caps.proc_ctls2.virtual_interrupt_delivery;
     }
-
-    die_reason("Unreachable");
-}
-
-void
-vmx_init_default_policy(struct vmx_virt_policy *policy)
-{
-    memset(policy, 0, sizeof(struct vmx_virt_policy));
-
-    policy->pin_ctls = set_reserved_pinbased_ctls_default1(policy->pin_ctls);
-    policy->proc_ctls1 = set_reserved_procbased_ctls1_default1(policy->proc_ctls1);
-    /* proc ctls 2&3 are per default initialized to all 0 */
-    policy->exit_ctls1 = set_reserved_vm_exit_ctls1_default1(policy->exit_ctls1);
-    /* vmexit ctls2 is per default initialized to all 0 */
-    policy->entry_ctls = set_reserved_vm_entry_ctls_default1(policy->entry_ctls);
+    unreachable();
 }
 
 bool
@@ -301,15 +299,24 @@ vmx_policy_is_option_configured(
                 && policy->proc_ctls2.enable_ept;
         case VMX_POLICY_MSR_BITMAP:
             return policy->proc_ctls1.msr_bitmaps;
+        case VMX_POLICY_IO_BITMAP:
+            return policy->proc_ctls1.io_bitmaps;
         case VMX_POLICY_UNRESTRICTED_GUEST:
             return policy->proc_ctls1.activate_secondary_controls
                 && policy->proc_ctls2.unrestricted_guest;
-        default:
-            pr_warn("No policy-support lookup for: %lu", U64(option));
-            return false;
+        case VMX_POLICY_VIRTUALIZE_APIC_ACCESSES:
+            return policy->proc_ctls2.virtualize_apic_accesses;
+        case VMX_POLICY_VIRTUALIZE_X2APIC_MODE:
+            return policy->proc_ctls2.virtualize_x2apic_mode;
+        case __VMX_POLICY_VIRTUALIZE_APIC:
+            return policy->proc_ctls2.virtualize_apic_accesses
+                || policy->proc_ctls2.virtualize_x2apic_mode;
+        case VMX_POLICY_APIC_REGISTER_VIRTUALIZATION:
+            return policy->proc_ctls2.apic_register_virtualization;
+        case VMX_POLICY_VIRTUAL_INTERRUPT_DELIVERY:
+            return policy->proc_ctls2.virtual_interrupt_delivery;
     }
-
-    die_reason("Unreachable");
+    unreachable();
 }
 
 #define VALIDATE_CONTROL(raw_caps, raw_policy) \
@@ -428,15 +435,41 @@ policy_validates_against_default_values(const struct vmx_virt_policy *policy)
 #undef VALIDATE_RESERVED
 
 /**
- * Based on the checks during a vm_entry.
- * Kinda a best effort approach to catch obvious issues and to make debugging
- * a bit simpler.
+ * Based on the checks performed during a vm_entry.
+ * Currently a best effort helper that covers a fraction of all checks.
  */
 static int
 validate_control_dependencies(const struct vmx_virt_policy *policy)
 {
-    return 0;
-    //NOT_YET_IMPLEMENTED;
+    if (policy->proc_ctls2.virtualize_apic_accesses
+            && policy->proc_ctls2.virtualize_x2apic_mode) {
+        pr_error("VMCS must not configure xapic & x2apic virtualization simultaneously");
+        return VMX_POLICY_INVALID;
+    }
+
+    if (!policy->proc_ctls1.tpr_shadow) {
+        const bool deps = policy->proc_ctls2.virtualize_x2apic_mode
+            || policy->proc_ctls2.apic_register_virtualization
+            || policy->proc_ctls2.virtual_interrupt_delivery
+            || policy->proc_ctls3.ipi_virtualization;
+
+        if (deps) {
+            pr_error("tpr_shadow=0 also requires virtualize_x2apic_mode=0, "
+                    "apic_register_virtualization=0, virtual_interrupt_deliver=0, "
+                    "and ipi_virtualization=0");
+            return VMX_POLICY_INVALID;
+        }
+    }
+
+    if (policy->proc_ctls2.virtual_interrupt_delivery) {
+        if (!policy->pin_ctls.external_interrupt_exiting) {
+            pr_error("virtual_interrupt_delivery=1 requires external_interrupt"
+                    "_handling=1");
+            return VMX_POLICY_INVALID;
+        }
+    }
+
+    return VMX_POLICY_VALID;
 }
 
 int
@@ -471,5 +504,18 @@ validate_vmx_virt_policy(const struct vmx_virt_policy *policy)
     }
 
     return VMX_POLICY_VALID;
+}
+
+void
+vmx_init_default_policy(struct vmx_virt_policy *policy)
+{
+    memset(policy, 0, sizeof(struct vmx_virt_policy));
+
+    policy->pin_ctls = set_reserved_pinbased_ctls_default1(policy->pin_ctls);
+    policy->proc_ctls1 = set_reserved_procbased_ctls1_default1(policy->proc_ctls1);
+    /* proc ctls 2&3 are per default initialized to all 0 */
+    policy->exit_ctls1 = set_reserved_vm_exit_ctls1_default1(policy->exit_ctls1);
+    /* vmexit ctls2 is per default initialized to all 0 */
+    policy->entry_ctls = set_reserved_vm_entry_ctls_default1(policy->entry_ctls);
 }
 
