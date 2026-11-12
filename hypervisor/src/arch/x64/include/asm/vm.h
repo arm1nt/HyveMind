@@ -9,6 +9,7 @@
 #include "asm/x86_defs.h"
 #include "vm/vlapic.h"
 #include "vm/vpic.h"
+#include "vm/vpit.h"
 #include "vmx/ept_types.h"
 #include "vmx/emulate.h"
 #include "vmx/vmcs.h"
@@ -29,6 +30,7 @@ struct vmx_vcpu_state {
     struct vmx_virt_policy *virt_policy;
 };
 
+#define vcpu_state(vcpu) ((vcpu)->arch.state)
 #define vcpu_vmx(vcpu) ((vcpu)->arch.hw.vmx)
 #define vcpu_event_lock(vcpu) (&(vcpu)->arch.event_queue_lock)
 
@@ -59,6 +61,7 @@ struct arch_vcpu {
 
 struct arch_vm {
     struct vpic *vpic;
+    struct vpit *vpit;
 
     struct {
         int host_serial_pio_base;

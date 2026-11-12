@@ -27,7 +27,6 @@ struct timer {
     enum timer_type type;
     void (*timer_action) (uint64_t tsc_irq_invoke, void *data);
     void *data;
-    /* cpu on which the timer is installed */
     cpuid_t cpu;
 };
 
@@ -40,6 +39,14 @@ do_busy_sleep(const uint64_t time_ns)
 }
 
 int init_timer_framework(void);
+
+struct timer *init_timer_deadline(const uint64_t timer_deadline);
+struct timer *init_timer_ns(const uint64_t time_ns, const enum timer_type type);
+struct timer *init_timer_hz(const uint64_t hz, const uint64_t ticks, const enum timer_type type);
+
+int add_timer(struct timer *timer);
+void update_timer_hz(struct timer *timer, const uint64_t hz, const uint64_t ticks);
+void delete_timer(struct timer *timer);
 
 #endif /* _HYVEMIND_TIMER_H */
 

@@ -7,12 +7,14 @@
 #define VM_IRQ_LINE_UNMAPPED -1
 typedef hwirq_t guest_hwirq_t;
 
+struct vm;
 struct vcpu;
 
 bool vcpu_has_external_irq(struct vcpu *vcpu);
 int vcpu_get_external_irq(struct vcpu *vcpu);
 
 int vm_external_irq_handler(struct irq_desc *desc, void *data);
+int vm_inject_external_guest_irq(const guest_hwirq_t irq, struct vm *vm);
 
 #endif /* _HYVEMIND_X64_VM_IRQ_H */
 

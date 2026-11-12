@@ -61,7 +61,7 @@ handle_guest_io_read(struct pio_operation *pio, vcpu_t *vcpu)
             break;
         case IO_PIT_START ... IO_PIT_END:
             pr_warn("Intercepted PIT read");
-            io_passthru_read(pio, regs);
+            vpit_read(vm_vpit(vcpu->vm), pio->port, (uint8_t *) &regs->rax);
             break;
         case IO_PIC_PRIMARY_START ... IO_PIC_PRIMARY_END:
             vpic_read(&vm_vpic(vcpu->vm)->vpic1, pio->port, (uint8_t *) &regs->rax);
@@ -84,7 +84,7 @@ handle_guest_io_write(struct pio_operation *pio, vcpu_t *vcpu)
             break;
         case IO_PIT_START ... IO_PIT_END:
             pr_warn("Intercepted PIT write");
-            io_passthru_write(pio, regs);
+            vpit_write(vm_vpit(vcpu->vm), pio->port, regs->rax);
             break;
         case IO_PIC_PRIMARY_START ... IO_PIC_PRIMARY_END:
             vpic_write(&vm_vpic(vcpu->vm)->vpic1, pio->port, regs->rax);

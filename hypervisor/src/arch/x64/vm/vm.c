@@ -140,21 +140,17 @@ prepare_vm_env_devices(struct vm *vm, const struct vm_config *config)
         return -1;
     }
 
+    vm_vpit(vm) = allocate_vpit(vm);
+    if (!vm_vpit(vm)) {
+        pr_error("Error allocating a vPIT for VM %s", vm->name);
+        NOT_YET_IMPLEMENTED;
+    }
+
     /* Per-default, we don't expose any host IRQ lines to the VM */
     for (int i = 0; i < NR_IRQS; i++) {
         vm_devices(vm).host_to_guest_irq[i] = VM_IRQ_LINE_UNMAPPED;
         vm_devices(vm).guest_to_host_irq[i] = VM_IRQ_LINE_UNMAPPED;
     }
-
-    /**
-     * Todo: Allocate vPIT
-     * --- temporary way to pass through the pit to let a guest launch
-     * --- Todo: remove
-     */
-    const hwirq_t pit_irq_line = 0x00;
-    vm_devices(vm).host_to_guest_irq[pit_irq_line] = pit_irq_line;
-    vm_devices(vm).guest_to_host_irq[pit_irq_line] = pit_irq_line;
-    /* --- Remove end */
 
     const struct guest_uart_info vm_uart = config->devices.uart_info;
     if (vm_uart.configured) {
