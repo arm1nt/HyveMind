@@ -38,8 +38,5 @@ int init_vlapic(struct vcpu *vcpu, const lapicid_t initial_apic_id, const bool i
 
 bool vlapic_accept_pic_irq(struct vcpu *vcpu);
 
-int guest_wrmsr_apic_base_msr(struct vcpu *vcpu, const uint64_t val);
-int guest_apic_register_write(struct vcpu *vcpu, const int reg);
-
 #endif /* _HYVEMIND_X64_VM_VLAPIC_H */
 

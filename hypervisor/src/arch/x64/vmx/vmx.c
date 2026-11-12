@@ -949,7 +949,7 @@ vmx_vm_exit_handler(vcpu_t *vcpu)
             vcpu_handle_xsetbv(vcpu);
             break;
         case EXIT_REASON_APIC_WRITE:
-            guest_apic_register_write(vcpu, exit_qualification_raw);
+            /* Currently we don't take any extra action after a vlapic write */
             break;
         default:
             dump_vcpu_state(vcpu);

@@ -1,7 +1,6 @@
 #include "fatal.h"
 #include "pf_alloc.h"
 #include "string.h"
-#include "timer.h"
 #include "vm.h"
 #include "asm/apic.h"
 #include "asm/apic_defs.h"
