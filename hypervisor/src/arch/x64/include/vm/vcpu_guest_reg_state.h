@@ -1,5 +1,5 @@
-#ifndef _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
-#define _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
+#ifndef _HYVEMIND_X64_VM_VCPU_GUEST_REG_STATE_H
+#define _HYVEMIND_X64_VM_VCPU_GUEST_REG_STATE_H
 
 #include "asm/segmentation.h"
 #include "vmx/vmcs.h"
@@ -89,5 +89,5 @@ struct vcpu_guest_reg_state {
     struct vcpu_sys_table idtr;
 };
 
-#endif /* _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H */
+#endif /* _HYVEMIND_X64_VM_VCPU_GUEST_REG_STATE_H */
 

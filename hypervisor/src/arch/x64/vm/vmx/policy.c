@@ -1,4 +1,3 @@
-#include "fatal.h"
 #include "string.h"
 #include "per-cpu.h"
 #include "printf.h"

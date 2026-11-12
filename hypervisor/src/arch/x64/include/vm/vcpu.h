@@ -1,7 +1,7 @@
 #ifndef _HYVEMIND_X64_VM_VCPU_H
 #define _HYVEMIND_X64_VM_VCPU_H
 
-#include "asm/vcpu_guest_reg_state.h"
+#include "vm/vcpu_guest_reg_state.h"
 
 struct vcpu;
 

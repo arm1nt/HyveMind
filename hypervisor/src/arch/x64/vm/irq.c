@@ -1,6 +1,5 @@
 #include "vm.h"
 #include "vm/irq.h"
-#include "asm/pic.h"
 
 bool
 vcpu_has_external_irq(struct vcpu *vcpu)
