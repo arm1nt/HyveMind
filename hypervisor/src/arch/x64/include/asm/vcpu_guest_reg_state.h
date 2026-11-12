@@ -1,7 +1,6 @@
 #ifndef _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
 #define _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H
 
-#include "hyvstdlib.h"
 #include "asm/segmentation.h"
 #include "vmx/vmcs.h"
 
@@ -89,10 +88,6 @@ struct vcpu_guest_reg_state {
     struct vcpu_sys_table gdtr;
     struct vcpu_sys_table idtr;
 };
-
-void reset_guest_reg_state_to_init_state(struct vcpu_guest_reg_state *state);
-void init_guest_reg_state_mirroring_host(struct vcpu_guest_reg_state *state);
-void init_guest_reg_state_for_linux_32bit(struct vcpu_guest_reg_state *state);
 
 #endif /* _HYVEMIND_X64_ASM_VCPU_GUEST_REG_STATE_H */
 

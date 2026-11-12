@@ -1,9 +1,13 @@
 #include "string.h"
-#include "asm/vcpu_guest_reg_state.h"
+#include "asm/cpufeatures.h"
 #include "asm/gdt_idt.h"
+#include "asm/processor.h"
 #include "asm/segmentation.h"
+#include "vm/vcpu.h"
+#include "vm/vlapic.h"
 #include "vmx/vmcs.h"
 #include "vmx/vmx.h"
+#include "vmx/vmx_ops.h"
 
 static inline vmcs_ar_t
 get_unusable_ar(void)
@@ -205,5 +209,98 @@ init_guest_reg_state_for_linux_32bit(struct vcpu_guest_reg_state *state)
     init_segments_for_linux_32bit(&state->segments);
 
     state->gdtr.limit = 0xFF;
+}
+
+static const char hyvemind_id[12] = "hyvemind   ";
+
+void
+vcpu_step_rip(vcpu_t *vcpu)
+{
+    uint64_t instr_length;
+    vmread(VM_EXIT_INSTRUCTION_LENGTH, &instr_length);
+    vcpu_state(vcpu).user_regs.rip += instr_length;
+}
+
+static inline void
+sanitize_initial_apic_id(vcpu_t *vcpu, cpuid_result_t *cpuid_val)
+{
+    const struct vlapic *vlapic = vcpu_vlapic(vcpu);
+    const uint32_t clear_id_bits_mask = ~(U32_LSHIFT(0xFF, 24));
+    cpuid_val->ebx &= clear_id_bits_mask;
+    cpuid_val->ebx |= U32_LSHIFT(vlapic->physical_apic_id, 24);
+}
+
+void
+vcpu_handle_cpuid(vcpu_t *vcpu)
+{
+    struct vcpu_user_regs *regs = &vcpu_state(vcpu).user_regs;
+    const uint64_t leaf = regs->rax;
+    const uint64_t sub_leaf = regs->rcx;
+    cpuid_result_t cpuid_res;
+
+    switch (leaf) {
+        case CPUID_VERSION_FEATURES_LEAF:
+            cpuid_res = cpuid_raw(leaf, sub_leaf);
+            sanitize_initial_apic_id(vcpu, &cpuid_res);
+            break;
+        case CPUID_EXT_TOPOLOGY_LEAF:
+        case CPUID_V2_EXT_TOPOLOGY_LEAF:
+            /* For now we simply pass through info other than the apic id */
+            cpuid_res = cpuid_raw(leaf, sub_leaf);
+            cpuid_res.edx = vcpu_vlapic(vcpu)->physical_apic_id;
+            break;
+        case 0x40000000:
+            memset(&cpuid_res, 0, sizeof(cpuid_result_t));
+            memcpy(&cpuid_res.ebx, &hyvemind_id[0], 4);
+            memcpy(&cpuid_res.ecx, &hyvemind_id[4], 4);
+            memcpy(&cpuid_res.edx, &hyvemind_id[8], 4);
+            break;
+        default:
+            cpuid_res = cpuid_raw(leaf, sub_leaf);
+    }
+
+    regs->rax = cpuid_res.eax;
+    regs->rbx = cpuid_res.ebx;
+    regs->rcx = cpuid_res.ecx;
+    regs->rdx = cpuid_res.edx;
+    vcpu_step_rip(vcpu);
+}
+
+void
+vcpu_handle_rdmsr(vcpu_t *vcpu)
+{
+    struct vcpu_user_regs *regs = &vcpu_state(vcpu).user_regs;
+    const uint64_t msr = regs->rcx;
+
+    /**
+     * Default MSRs can be accessed without VM-exit, but certain MSRs need
+     * extra handling:
+     */
+    switch (msr) {
+        case MSRX64_IA32_APIC_BASE:
+            regs->rax = U64_LOWER32(vcpu_vlapic(vcpu)->apic_base_msr.raw);
+            regs->rdx = U64_UPPER32(vcpu_vlapic(vcpu)->apic_base_msr.raw);
+            break;
+        default:
+            vmx_inject_exception(vcpu, IRQ_GP_VECTOR, 0);
+            return;
+    }
+
+    vcpu_step_rip(vcpu);
+}
+
+void
+vcpu_handle_xsetbv(vcpu_t *vcpu)
+{
+    struct vcpu_user_regs *regs = &vcpu_state(vcpu).user_regs;
+
+    if (regs->rcx != 0) {
+        vmx_inject_exception(vcpu, IRQ_UD_VECTOR, 0);
+        return;
+    }
+
+    /* Theoretically, we need more checks, e.g. do host&guest support xsave, etc. */
+    asm volatile ("xsetbv" :: "a"(regs->rax), "d"(regs->rdx), "c"(regs->rcx));
+    vcpu_step_rip(vcpu);
 }
 

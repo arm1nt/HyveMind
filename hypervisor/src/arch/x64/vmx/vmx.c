@@ -11,7 +11,7 @@
 #include "asm/processor.h"
 #include "asm/vmm.h"
 #include "vm/io.h"
-#include "vmx/emulate.h"
+#include "vm/vcpu.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
 #include "vmx/vmcs.h"
@@ -904,7 +904,6 @@ vmx_vm_exit_handler(vcpu_t *vcpu)
 {
     uint64_t exit_reason_raw, exit_qualification_raw;
     vmcs_exit_reason_t exit_reason;
-    const struct x86_emulate_ops *emu_ops = &vcpu->vm->arch_vm.vmx.ops;
     struct vcpu_user_regs *regs = &vcpu->arch.state.user_regs;
 
     spinlock_acquire(&vcpu->lock);
@@ -935,24 +934,19 @@ vmx_vm_exit_handler(vcpu_t *vcpu)
             vmx_set_intr_window_exiting_ctrl(0);
             break;
         case EXIT_REASON_CPUID:
-            emu_ops->emulate_cpuid(vcpu, regs);
+            vcpu_handle_cpuid(vcpu);
             break;
         case EXIT_REASON_IO_INSTRUCTION:
             struct pio_operation pio = vmx_exit_qual_to_pio_op(exit_qualification_raw);
             handle_guest_io_op(&pio, vcpu);
-            step_guest_rip(regs);
+            vcpu_step_rip(vcpu);
             break;
         case EXIT_REASON_RDMSR_IMPLICIT:
         case EXIT_REASON_RDMSR_IMMEDIATE:
-            emu_ops->emulate_rdmsr(vcpu, regs);
-            break;
-        case EXIT_REASON_WRMSR_IMPLICIT_WRMSRNS:
-        case EXIT_REASON_WRMSRNS_IMMEDIATE:
-        case EXIT_REASON_WRMSRLIST:
-            emu_ops->emulate_wrmsr(vcpu, regs);
+            vcpu_handle_rdmsr(vcpu);
             break;
         case EXIT_REASON_XSETBV:
-            emu_ops->emulate_xsetbv(vcpu, regs);
+            vcpu_handle_xsetbv(vcpu);
             break;
         case EXIT_REASON_APIC_WRITE:
             guest_apic_register_write(vcpu, exit_qualification_raw);

@@ -11,7 +11,6 @@
 #include "vm/vpic.h"
 #include "vm/vpit.h"
 #include "vmx/ept_types.h"
-#include "vmx/emulate.h"
 #include "vmx/vmcs.h"
 
 struct vm;
@@ -75,7 +74,6 @@ struct arch_vm {
         phys_addr_t io_bitmap_addr;
         phys_addr_t msr_bitmap_addr;
         phys_addr_t apic_access_page;
-        struct x86_emulate_ops ops;
     } vmx;
 };
 

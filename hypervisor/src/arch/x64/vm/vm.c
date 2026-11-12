@@ -6,6 +6,7 @@
 #include "asm/apic_defs.h"
 #include "asm/irq.h"
 #include "loader/loader.h"
+#include "vm/vcpu.h"
 #include "vmx/ept.h"
 #include "vmx/policy.h"
 #include "vmx/vmx.h"
@@ -311,8 +312,6 @@ prepare_env_for_guest(struct vm *vm, const struct vm_config *config)
 {
     switch (config->type) {
         case LINUX_DIRECT_BOOT_32BIT:
-            /* Todo: eventually remove the ops struct */
-            vm->arch_vm.vmx.ops = emulate_ops;
             return prepare_env_linux_boot_32bit(vm, config);
         default:
             die_reason("Unsupported guest type");
