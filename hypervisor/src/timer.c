@@ -112,6 +112,17 @@ heapify_down(struct timer_heap *heap, const unsigned int node_idx)
     }
 }
 
+static inline int
+get_heap_elem_index(const struct timer_heap *heap, const struct timer *target)
+{
+    for (int i = HEAP_ROOT_INDEX; i < heap->insertion_idx; i++) {
+        if (target == heap->flattened_tree[i])
+            return i;
+    }
+
+    return -1;
+}
+
 static void
 delete_heap_element(struct timer_heap *heap, const unsigned int idx)
 {
@@ -252,6 +263,21 @@ add_timer(struct timer *timer)
     ret = __add_timer(timer);
     restore_irq_status(flags);
     return ret;
+}
+
+void
+delete_timer(struct timer *timer)
+{
+    const uint64_t flags = disable_irq_save_status();
+    struct timer_heap *heap = percpu_val(timer_heap);
+
+    const int index = get_heap_elem_index(heap, timer);
+    if (index == -1)
+        goto out;
+
+    delete_heap_element(heap, index);
+out:
+    restore_irq_status(flags);
 }
 
 void
