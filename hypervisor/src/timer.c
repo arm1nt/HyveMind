@@ -1,3 +1,4 @@
+#include "cpu_topology.h"
 #include "halloc.h"
 #include "per-cpu.h"
 #include "printf.h"
@@ -6,9 +7,7 @@
 #include "asm/processor.h"
 
 /* Maintain a min-heap to order how we program the timer */
-
 struct timer_heap;
-
 DEFINE_PER_CPU(struct timer_heap *, timer_heap);
 
 #define HEAP_ROOT_INDEX         1
@@ -26,18 +25,18 @@ struct timer_heap {
 };
 
 static int
-init_timer_heap(void)
+init_timer_heap(cpuid_t cpuid)
 {
     struct timer_heap *heap = (struct timer_heap *) hmalloc(sizeof(struct timer_heap));
     if (!heap) {
-        pr_error("Failed to allocate timer heap");
+        pr_error("Failed to allocate timer heap for cpu %lu", cpuid);
         return TIMER_NO_MEM;
     }
 
     heap->flattened_tree =
         (struct timer **) hmalloc(INIT_TIMER_HEAP_CAPACITY * sizeof(struct timer*));
     if (!heap->flattened_tree) {
-        pr_error("Failed to allocate the internal heap array");
+        pr_error("Failed to allocate the internal timer-heap array for cpu %lu", cpuid);
         hfree(heap);
         return TIMER_NO_MEM;
     }
@@ -45,8 +44,7 @@ init_timer_heap(void)
     heap->capacity = INIT_TIMER_HEAP_CAPACITY;
     heap->insertion_idx = HEAP_ROOT_INDEX;
 
-    set_percpu_val(timer_heap, heap);
-
+    set_percpu_val_raw(timer_heap, cpuid, heap);
     return TIMER_SUCCESS;
 }
 
@@ -217,22 +215,19 @@ struct timer *
 init_timer_hz(const uint64_t hz, const uint64_t ticks, const enum timer_type type)
 {
     const uint64_t now = read_tsc();
-    const   uint64_t timer_ticks = __get_ticks_from_hz(ticks, hz);
+    const uint64_t timer_ticks = __get_ticks_from_hz(ticks, hz);
     return __init_timer(now + timer_ticks, timer_ticks, type);
 }
 
-int
-add_timer(struct timer *timer)
+static int
+__add_timer(struct timer *timer)
 {
-    const uint64_t status = disable_irq_save_status();
-
     int ret;
     struct timer_heap *heap = percpu_val(timer_heap);
     struct timer *earliest_deadline;
 
     if (heap_add_timer(heap, timer) != TIMER_SUCCESS) {
         pr_error("Failed to add timer to the timer heap");
-        restore_irq_status(status);
         return TIMER_ERROR;
     }
 
@@ -242,21 +237,29 @@ add_timer(struct timer *timer)
         ret = arch_reprogram_timer(timer->elapse_deadline);
         if (ret != TIMER_SUCCESS) {
             pr_error("Failed to reprogram time to new deadline %lu", timer->elapse_deadline);
-            restore_irq_status(status);
             return TIMER_PROGRAMMING_FAILED;
         }
     }
 
-    restore_irq_status(status);
     return TIMER_SUCCESS;
+}
+
+int
+add_timer(struct timer *timer)
+{
+    int ret;
+    const uint64_t flags = disable_irq_save_status();
+    ret = __add_timer(timer);
+    restore_irq_status(flags);
+    return ret;
 }
 
 void
 irq_timer_handler(void)
 {
     const uint64_t now = read_tsc();
-    struct timer_heap *heap = percpu_val(timer_heap);
     struct timer *earliest_timer;
+    struct timer_heap *heap = percpu_val(timer_heap);
 
     while (1) {
         if (!get_heap_root(heap, &earliest_timer)) {
@@ -264,7 +267,7 @@ irq_timer_handler(void)
             return;
         }
 
-        if (earliest_timer->elapse_deadline > read_tsc()) {
+        if (earliest_timer->elapse_deadline > now) {
             arch_reprogram_timer(earliest_timer->elapse_deadline);
             break;
         }
@@ -274,7 +277,7 @@ irq_timer_handler(void)
 
         if (earliest_timer->type == TIMER_PERIODIC) {
             earliest_timer->elapse_deadline += earliest_timer->periodic_ticks;
-            add_timer(earliest_timer);
+            __add_timer(earliest_timer);
         }
     }
 }
@@ -283,14 +286,14 @@ int
 init_timer_framework(void)
 {
     int ret;
+    cpuid_t id;
 
-    if ((ret = arch_init_timer_framework()) != TIMER_SUCCESS) {
+    if ((ret = arch_init_timer_framework()) != TIMER_SUCCESS)
         return ret;
-    }
 
-    if ((ret = init_timer_heap()) != TIMER_SUCCESS) {
-        pr_error("Error initializing timer heap");
-        return ret;
+    for_each_cpuid_in_cpumask_present(id) {
+        if ((ret = init_timer_heap(id)) != TIMER_SUCCESS)
+            return ret;
     }
 
     return TIMER_SUCCESS;
